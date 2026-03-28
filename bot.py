@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
-AI News Bot - Telegram бот с интерактивными кнопками
-Команды:
-  /start   - главное меню с кнопками
-  /news    - полная сводка новостей
-  /post    - короткий пост про новости
-  /digest  - дайджест для канала (с одобрением)
+AI News Bot — Telegram бот с интерактивными кнопками
+Команды: /start /news /post /digest
 """
 
 import os
+import re
 import sys
 import logging
 import threading
@@ -37,13 +34,12 @@ USER_ID    = int(os.getenv('TELEGRAM_USER_ID'))
 OPENAI_KEY = os.getenv('OPENAI_API_KEY')
 CHANNEL_ID = '@ai_is_you'
 
-# Ожидающие публикации дайджесты: key -> text
 pending_digests: dict = {}
 
 agent = NewsAgent(OPENAI_KEY, BOT_TOKEN, str(USER_ID))
 
 
-# ─── Telegram API helpers ────────────────────────────────────────────────────
+# ─── Telegram API ─────────────────────────────────────────────────────────────
 
 def tg(method: str, **kwargs) -> dict:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
@@ -84,17 +80,17 @@ def answer_cb(callback_query_id, text: str = ""):
     tg("answerCallbackQuery", callback_query_id=callback_query_id, text=text)
 
 
-# ─── Клавиатуры ─────────────────────────────────────────────────────────────
+# ─── Клавиатуры ──────────────────────────────────────────────────────────────
 
 def main_kb():
     return {
         "inline_keyboard": [
             [
-                {"text": "📰 Полная сводка",    "callback_data": "cmd_news"},
-                {"text": "✍️ Короткий пост",    "callback_data": "cmd_post"}
+                {"text": "Полная сводка",    "callback_data": "cmd_news"},
+                {"text": "Короткий пост",    "callback_data": "cmd_post"}
             ],
             [
-                {"text": "📢 Дайджест в канал", "callback_data": "cmd_digest"}
+                {"text": "Дайджест в канал", "callback_data": "cmd_digest"}
             ]
         ]
     }
@@ -103,97 +99,118 @@ def main_kb():
 def approve_kb(key: str):
     return {
         "inline_keyboard": [[
-            {"text": "✅ Опубликовать в канал", "callback_data": f"approve_{key}"},
-            {"text": "❌ Отмена",               "callback_data": f"cancel_{key}"}
+            {"text": "Опубликовать в канал", "callback_data": f"approve_{key}"},
+            {"text": "Отмена",               "callback_data": f"cancel_{key}"}
         ]]
     }
 
 
-# ─── AI генерация ────────────────────────────────────────────────────────────
+# ─── AI генерация ─────────────────────────────────────────────────────────────
 
 def generate_short_post(news_items: list) -> str:
-    """Короткий живой пост ~150-200 слов"""
+    """
+    Короткий авторский пост для Telegram-канала.
+    Принципы: конкретный заголовок, 2-3 события, вывод, без эмодзи и хэштегов.
+    """
     if not news_items:
         return "Свежих новостей об ИИ пока нет."
 
     news_text = "\n".join(
         f"{i}. {item['title']}" for i, item in enumerate(news_items[:10], 1)
     )
-    prompt = (
-        "На основе этих новостей об ИИ напиши короткий, живой пост для Telegram (150-200 слов).\n"
-        "Стиль: информативный, без воды, как эксперт-энтузиаст ИИ.\n"
-        "Начни с цепляющего заголовка. Упомяни 2-3 самых важных события.\n"
-        "Заверши коротким выводом. Без хэштегов. На русском языке.\n\n"
-        f"НОВОСТИ:\n{news_text}"
-    )
+
+    prompt = f"""Ты редактор Telegram-канала об искусственном интеллекте.
+Напиши короткий авторский пост (150–200 слов) по следующим новостям.
+
+Правила:
+— Никаких эмодзи
+— Никаких хэштегов
+— Никаких маркированных списков со звёздочками или тире
+— Заголовок: конкретный, фактический, одна строка, ЗАГЛАВНЫМИ БУКВАМИ
+— Затем 2–3 абзаца: каждый — одна мысль, одно событие, одно следствие
+— Финальный абзац: краткий вывод или вопрос к читателю
+— Язык: русский, стиль делового медиа (РБК, Коммерсантъ)
+
+НОВОСТИ:
+{news_text}"""
+
     try:
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_KEY)
         resp = client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[
-                {"role": "system", "content": "Ты редактор Telegram-канала про ИИ. Пишешь живо, кратко, по делу."},
+                {"role": "system", "content": "Ты редактор делового Telegram-канала об ИИ. Пишешь без эмодзи, конкретно и по делу."},
                 {"role": "user",   "content": prompt}
             ],
-            temperature=0.8,
-            max_tokens=400
+            temperature=0.7,
+            max_tokens=450
         )
-        return resp.choices[0].message.content
+        return resp.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"OpenAI short_post: {e}")
         return f"Ошибка генерации поста: {e}"
 
 
 def generate_digest(news_items: list) -> str:
-    """Дайджест для канала — тезисы + гиперссылки ➡️ Источник"""
+    """
+    Дайджест для Telegram-канала.
+    Структура: шапка / рубрики / тезисы / подпись.
+    Без эмодзи. Ссылки — гиперссылки 'Источник'.
+    """
     if not news_items:
         return "Свежих новостей об ИИ пока нет."
 
-    today = datetime.now().strftime('%d.%m.%Y')
-
-    # Передаём в GPT только заголовки (без ссылок) — ссылки добавим сами
+    today     = datetime.now().strftime('%d.%m.%Y')
     news_text = "\n".join(
         f"{i}. {item['title']}" for i, item in enumerate(news_items[:12], 1)
     )
-    prompt = (
-        f"Создай дайджест новостей об ИИ для Telegram-канала.\n"
-        f"Дата: {today}\n\n"
-        "Формат строго такой:\n"
-        "Строка 1: заголовок «🤖 AI Дайджест | [дата]»\n"
-        "Затем 5-7 пунктов. Каждый пункт — ОДНА строка: порядковый номер, точка, пробел, тезис.\n"
-        "Тезис — одно конкретное предложение на русском языке.\n"
-        "НЕ добавляй ссылки — они будут добавлены автоматически.\n"
-        "В конце одна строка: «📡 @ai_is_you»\n\n"
-        f"НОВОСТИ:\n{news_text}"
-    )
+
+    prompt = f"""Ты редактор делового Telegram-канала об искусственном интеллекте.
+Создай дайджест новостей за {today}.
+
+Правила форматирования (строго):
+— Никаких эмодзи
+— Никаких хэштегов
+— Никаких маркированных списков со звёздочками или тире
+— Строка 1: «AI ДАЙДЖЕСТ — {today}» (заглавными, без кавычек)
+— Строка 2: пустая
+— Строка 3: рубрика — одно слово заглавными, например «ИССЛЕДОВАНИЯ» или «ИНДУСТРИЯ» или «ПРОДУКТЫ» (выбери наиболее подходящую по смыслу)
+— Затем 5–7 тезисов. Каждый тезис — ОДНА строка: порядковый номер, точка, пробел, конкретное предложение.
+  Тезис должен содержать: субъект + действие + результат. Не пересказывай заголовок — добавь контекст.
+— После всех тезисов пустая строка
+— Последняя строка: «@ai_is_you»
+— НЕ добавляй ссылки — они будут вставлены автоматически
+
+НОВОСТИ:
+{news_text}"""
+
     try:
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_KEY)
         resp = client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[
-                {"role": "system", "content": "Ты редактор Telegram-канала про ИИ. Создаёшь чёткие дайджесты."},
+                {"role": "system", "content": "Ты редактор делового Telegram-канала об ИИ. Пишешь без эмодзи, строго по формату, конкретно."},
                 {"role": "user",   "content": prompt}
             ],
-            temperature=0.5,
-            max_tokens=600
+            temperature=0.4,
+            max_tokens=700
         )
         raw = resp.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"OpenAI digest: {e}")
         return f"Ошибка генерации дайджеста: {e}"
 
-    # Вставляем гиперссылки ➡️ Источник после каждого тезиса
+    # Вставляем гиперссылки «Источник» после каждого тезиса
     lines = raw.split('\n')
     result_lines = []
     news_idx = 0
-    import re
     for line in lines:
         stripped = line.strip()
         if not stripped:
             result_lines.append('')
             continue
-        # Строки с тезисами: начинаются с цифры и точки (1. 2. ... 12.)
         if re.match(r'^\d+\.', stripped) and news_idx < len(news_items):
             link = news_items[news_idx]['link']
             result_lines.append(f"{html_escape(stripped)}  {source_link(link)}")
@@ -204,14 +221,56 @@ def generate_digest(news_items: list) -> str:
     return '\n'.join(result_lines)
 
 
-# ─── Обработчики действий ────────────────────────────────────────────────────
+# ─── Форматирование сводки (без эмодзи) ──────────────────────────────────────
+
+def format_full_digest(news_items: list, ai_analysis: str) -> list[str]:
+    """Возвращает список сообщений для полной сводки без эмодзи."""
+    now = datetime.now().strftime('%d.%m.%Y %H:%M')
+    messages = []
+
+    # Блок 1: AI-анализ
+    msg = (
+        f"<b>AI-АНАЛИЗ НОВОСТЕЙ ОБ ИИ</b>\n"
+        f"<i>{now} МСК</i>\n"
+        f"{'─' * 30}\n\n"
+        f"{html_escape(ai_analysis)}"
+    )
+    messages.append(msg)
+
+    # Блок 2+: список новостей
+    header = f"<b>НОВОСТИ ЗА ПЕРИОД — {len(news_items)} материалов</b>\n\n"
+    current = header
+    for i, item in enumerate(news_items[:15], 1):
+        title  = html_escape(item['title'])
+        src    = html_escape(item['source'])
+        date   = item['published']
+        link   = item['link']
+
+        line = f"{i}. <b>{title}</b>\n"
+        line += f"   <i>{src}"
+        if date:
+            line += f" · {date}"
+        line += f"</i>  {source_link(link)}\n\n"
+
+        if len(current) + len(line) > 3800:
+            messages.append(current)
+            current = ""
+        current += line
+
+    if current:
+        messages.append(current)
+
+    return messages
+
+
+# ─── Обработчики ─────────────────────────────────────────────────────────────
 
 def handle_start(chat_id):
     text = (
-        "👋 Привет! Я <b>AI News Agent</b>.\n\n"
+        "<b>AI News Agent</b>\n\n"
         "Собираю актуальные новости об искусственном интеллекте "
-        "и отправляю сводки в <b>09:00, 16:00 и 20:00 МСК</b>.\n\n"
-        "Выбери действие:"
+        "из 7 источников и отправляю сводки в <b>09:00, 16:00 и 20:00 МСК</b>.\n\n"
+        "Выберите действие:"
     )
     send(chat_id, text, reply_markup=main_kb())
 
@@ -219,37 +278,39 @@ def handle_start(chat_id):
 def handle_news(chat_id, cb_id=None):
     if cb_id:
         answer_cb(cb_id, "Собираю новости...")
-    send(chat_id, "⏳ Собираю полную сводку новостей, подождите 1-2 минуты...")
+    send(chat_id, "Собираю полную сводку новостей. Подождите 1–2 минуты...")
     try:
         news = agent.fetch_news(hours_back=8) or agent.fetch_news(hours_back=48)
         if not news:
-            send(chat_id, "😔 Свежих новостей не найдено. Попробуйте позже.", reply_markup=main_kb())
+            send(chat_id, "Свежих новостей не найдено. Попробуйте позже.", reply_markup=main_kb())
             return
         ai_analysis = agent.analyze_with_ai(news)
-        agent.format_and_send(news, ai_analysis, chat_id=str(chat_id))
-        send(chat_id, "✅ Сводка отправлена выше!", reply_markup=main_kb())
+        for msg in format_full_digest(news, ai_analysis):
+            send(chat_id, msg)
+        send(chat_id, "Сводка сформирована.", reply_markup=main_kb())
     except Exception as e:
         logger.error(f"handle_news: {e}")
-        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
 def handle_post(chat_id, cb_id=None):
     if cb_id:
         answer_cb(cb_id, "Генерирую пост...")
-    send(chat_id, "✍️ Генерирую короткий пост, секунду...")
+    send(chat_id, "Генерирую короткий пост, секунду...")
     try:
         news = agent.fetch_news(hours_back=8) or agent.fetch_news(hours_back=48)
         post_text = generate_short_post(news)
+        # Пост — plain text от GPT, экранируем и отправляем
         send(chat_id, html_escape(post_text), reply_markup=main_kb())
     except Exception as e:
         logger.error(f"handle_post: {e}")
-        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
 def handle_digest(chat_id, cb_id=None):
     if cb_id:
         answer_cb(cb_id, "Готовлю дайджест...")
-    send(chat_id, "📢 Готовлю дайджест для канала, секунду...")
+    send(chat_id, "Готовлю дайджест для канала, секунду...")
     try:
         news = agent.fetch_news(hours_back=8) or agent.fetch_news(hours_back=48)
         digest_html = generate_digest(news)
@@ -258,22 +319,23 @@ def handle_digest(chat_id, cb_id=None):
         pending_digests[key] = digest_html
 
         preview = (
-            f"📋 <b>ПРЕВЬЮ ДАЙДЖЕСТА ДЛЯ КАНАЛА {CHANNEL_ID}:</b>\n\n"
+            f"<b>ПРЕВЬЮ ДАЙДЖЕСТА ДЛЯ КАНАЛА {CHANNEL_ID}</b>\n"
+            f"{'─' * 30}\n\n"
             f"{digest_html}\n\n"
-            "─────────────────\n"
+            f"{'─' * 30}\n"
             "Опубликовать в канал?"
         )
         send(chat_id, preview, reply_markup=approve_kb(key))
     except Exception as e:
         logger.error(f"handle_digest: {e}")
-        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
 def handle_approve(chat_id, message_id, key, cb_id):
     answer_cb(cb_id, "Публикую...")
     digest_html = pending_digests.pop(key, None)
     if not digest_html:
-        edit_msg(chat_id, message_id, "❌ Дайджест не найден или уже опубликован.")
+        edit_msg(chat_id, message_id, "Дайджест не найден или уже опубликован.")
         return
     try:
         result = tg("sendMessage",
@@ -282,22 +344,22 @@ def handle_approve(chat_id, message_id, key, cb_id):
                     parse_mode="HTML",
                     disable_web_page_preview=True)
         if result.get("ok"):
-            edit_msg(chat_id, message_id, f"✅ Дайджест опубликован в <b>{CHANNEL_ID}</b>!")
+            edit_msg(chat_id, message_id, f"Дайджест опубликован в <b>{CHANNEL_ID}</b>.")
             send(chat_id, "Что-то ещё?", reply_markup=main_kb())
         else:
             err = html_escape(result.get("description", "неизвестная ошибка"))
             edit_msg(chat_id, message_id,
-                     f"❌ Ошибка публикации: {err}\n\n"
-                     "Убедитесь что бот добавлен в канал как администратор.")
+                     f"Ошибка публикации: {err}\n\n"
+                     "Убедитесь, что бот добавлен в канал как администратор.")
     except Exception as e:
         logger.error(f"handle_approve: {e}")
-        edit_msg(chat_id, message_id, f"❌ Ошибка: {html_escape(str(e))}")
+        edit_msg(chat_id, message_id, f"Ошибка: {html_escape(str(e))}")
 
 
 def handle_cancel(chat_id, message_id, key, cb_id):
     answer_cb(cb_id, "Отменено")
     pending_digests.pop(key, None)
-    edit_msg(chat_id, message_id, "❌ Публикация отменена.")
+    edit_msg(chat_id, message_id, "Публикация отменена.")
     send(chat_id, "Что-то ещё?", reply_markup=main_kb())
 
 
@@ -305,7 +367,6 @@ def handle_cancel(chat_id, message_id, key, cb_id):
 
 def process_update(update: dict):
     try:
-        # Callback query (нажатие кнопки)
         if "callback_query" in update:
             cq      = update["callback_query"]
             cb_id   = cq["id"]
@@ -314,7 +375,7 @@ def process_update(update: dict):
             msg_id  = cq["message"]["message_id"]
 
             if cq["from"]["id"] != USER_ID:
-                answer_cb(cb_id, "⛔ Нет доступа")
+                answer_cb(cb_id, "Нет доступа")
                 return
 
             if   data == "cmd_news":
@@ -333,7 +394,6 @@ def process_update(update: dict):
                 answer_cb(cb_id)
             return
 
-        # Текстовое сообщение
         if "message" not in update:
             return
 
