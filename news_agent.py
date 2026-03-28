@@ -30,6 +30,17 @@ RSS_FEEDS = [
     {'name': 'OpenAI Blog',     'url': 'https://openai.com/blog/rss.xml',                          'category': 'OpenAI'},
 ]
 
+
+def html_escape(text: str) -> str:
+    """Экранирует спецсимволы HTML для Telegram"""
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
+def source_link(url: str) -> str:
+    """Создаёт HTML гиперссылку вида ➡️ Источник"""
+    return f'<a href="{url}">➡️ Источник</a>'
+
+
 class NewsAgent:
     def __init__(self, openai_api_key: str, telegram_token: str, user_id: str):
         self.client = OpenAI(api_key=openai_api_key)
@@ -44,12 +55,6 @@ class NewsAgent:
         for feed_config in RSS_FEEDS:
             try:
                 logger.info(f"Загружаю {feed_config['name']}...")
-                # Устанавливаем таймаут через requests и передаём в feedparser
-                import urllib.request
-                req = urllib.request.Request(
-                    feed_config['url'],
-                    headers={'User-Agent': 'Mozilla/5.0 AI-News-Agent/1.0'}
-                )
                 import socket
                 old_timeout = socket.getdefaulttimeout()
                 socket.setdefaulttimeout(10)
@@ -110,7 +115,7 @@ class NewsAgent:
             news_text += f"{i}. [{item['source']}] {item['title']}\n"
             if item['summary']:
                 news_text += f"   {item['summary'][:200]}\n"
-            news_text += f"   Ссылка: {item['link']}\n\n"
+            news_text += "\n"
 
         prompt = f"""Ты AI-аналитик. Проанализируй следующие новости об искусственном интеллекте и создай структурированную сводку на русском языке.
 
@@ -145,12 +150,15 @@ class NewsAgent:
             logger.error(f"Ошибка OpenAI: {e}")
             return f"Не удалось получить AI-анализ: {e}"
 
-    def send_telegram(self, text: str) -> bool:
+    def send_telegram(self, text: str, chat_id: str = None, parse_mode: str = "HTML") -> bool:
+        """Отправляет сообщение в Telegram с поддержкой HTML"""
+        target = chat_id or self.user_id
         try:
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
             data = {
-                "chat_id": self.user_id,
+                "chat_id": target,
                 "text": text,
+                "parse_mode": parse_mode,
                 "disable_web_page_preview": True
             }
             response = requests.post(url, data=data, timeout=15)
@@ -164,36 +172,38 @@ class NewsAgent:
             logger.error(f"Ошибка отправки: {e}")
             return False
 
-    def format_and_send(self, news_items: List[Dict], ai_analysis: str):
+    def format_and_send(self, news_items: List[Dict], ai_analysis: str, chat_id: str = None):
         now = datetime.now().strftime('%d.%m.%Y %H:%M')
 
-        # Сообщение 1: AI анализ
-        msg1 = f"AI-СВОДКА НОВОСТЕЙ ОБ ИИ\n"
-        msg1 += f"Время: {now} МСК\n"
-        msg1 += "=" * 30 + "\n\n"
-        msg1 += ai_analysis
-        self.send_telegram(msg1)
+        # Сообщение 1: AI анализ (экранируем текст от GPT, т.к. он может содержать < > &)
+        msg1 = f"<b>🤖 AI-СВОДКА НОВОСТЕЙ ОБ ИИ</b>\n"
+        msg1 += f"<i>Время: {now} МСК</i>\n"
+        msg1 += "─" * 28 + "\n\n"
+        msg1 += html_escape(ai_analysis)
+        self.send_telegram(msg1, chat_id=chat_id)
 
-        # Сообщение 2: Список новостей
-        msg2 = f"НОВОСТИ ЗА ПЕРИОД ({len(news_items)} шт.):\n\n"
+        # Сообщение 2: Список новостей с гиперссылками ➡️ Источник
+        msg2 = f"<b>📋 НОВОСТИ ЗА ПЕРИОД ({len(news_items)} шт.):</b>\n\n"
         for i, item in enumerate(news_items[:15], 1):
-            title = item['title']
-            source = item['source']
-            link = item['link']
-            date = item['published']
-            entry = f"{i}. {title}\n   Источник: {source}"
+            title = html_escape(item['title'])
+            src   = html_escape(item['source'])
+            link  = item['link']
+            date  = item['published']
+
+            entry  = f"{i}. <b>{title}</b>\n"
+            entry += f"   <i>{src}"
             if date:
-                entry += f" ({date})"
-            entry += f"\n   {link}\n\n"
+                entry += f" · {date}"
+            entry += f"</i>  {source_link(link)}\n\n"
 
             if len(msg2) + len(entry) > 3800:
-                self.send_telegram(msg2)
+                self.send_telegram(msg2, chat_id=chat_id)
                 msg2 = ""
 
             msg2 += entry
 
         if msg2:
-            self.send_telegram(msg2)
+            self.send_telegram(msg2, chat_id=chat_id)
 
     def run(self) -> bool:
         logger.info("=== Запуск цикла сбора новостей ===")
@@ -206,7 +216,7 @@ class NewsAgent:
 
         if not news:
             logger.warning("Новостей не найдено вообще")
-            self.send_telegram("Новостей об ИИ за последние 48 часов не найдено.")
+            self.send_telegram("😔 Новостей об ИИ за последние 48 часов не найдено.")
             return False
 
         logger.info(f"Анализирую {len(news)} новостей через OpenAI...")
@@ -222,8 +232,8 @@ if __name__ == "__main__":
     load_dotenv('/opt/ai-news-agent/.env')
 
     openai_key = os.getenv('OPENAI_API_KEY')
-    tg_token = os.getenv('TELEGRAM_BOT_TOKEN')
-    user_id = os.getenv('TELEGRAM_USER_ID')
+    tg_token   = os.getenv('TELEGRAM_BOT_TOKEN')
+    user_id    = os.getenv('TELEGRAM_USER_ID')
 
     if not all([openai_key, tg_token, user_id]):
         logger.error("Не установлены переменные окружения")

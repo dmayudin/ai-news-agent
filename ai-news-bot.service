@@ -1,0 +1,20 @@
+[Unit]
+Description=AI News Bot - Telegram bot with interactive buttons
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ai-news-agent
+ExecStart=/usr/bin/python3 /opt/ai-news-agent/bot.py
+Restart=always
+RestartSec=10
+Environment=TZ=Europe/Moscow
+EnvironmentFile=/opt/ai-news-agent/.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-news-bot
+
+[Install]
+WantedBy=multi-user.target
