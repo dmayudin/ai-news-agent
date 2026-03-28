@@ -1,0 +1,25 @@
+[Unit]
+Description=AI News Agent - RSS News Collector with OpenAI Processing
+After=network.target
+Wants=wg-quick@wg0.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ai-news-agent
+ExecStart=/usr/bin/python3 /opt/ai-news-agent/scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-news-agent
+
+# Environment variables
+EnvironmentFile=/opt/ai-news-agent/.env
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
