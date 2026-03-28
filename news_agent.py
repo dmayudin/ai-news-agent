@@ -137,7 +137,7 @@ class NewsAgent:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model="gpt-4.1",
                 messages=[
                     {"role": "system", "content": "Ты эксперт-аналитик в области ИИ. Пишешь кратко, по делу, на русском языке."},
                     {"role": "user", "content": prompt}
