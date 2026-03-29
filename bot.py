@@ -28,11 +28,14 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, '/opt/ai-news-agent')
 from news_agent import NewsAgent, html_escape, source_link
+from llm_client import chat_complete
+from notion_sync import sync_ideas_to_notion, format_notion_report
 
-BOT_TOKEN  = os.getenv('TELEGRAM_BOT_TOKEN')
-USER_ID    = int(os.getenv('TELEGRAM_USER_ID'))
-OPENAI_KEY = os.getenv('OPENAI_API_KEY')
-CHANNEL_ID = '@ai_is_you'
+BOT_TOKEN        = os.getenv('TELEGRAM_BOT_TOKEN')
+USER_ID          = int(os.getenv('TELEGRAM_USER_ID'))
+OPENAI_KEY       = os.getenv('OPENAI_API_KEY')
+OPENROUTER_KEY   = os.getenv('OPENROUTER_API_KEY')
+CHANNEL_ID       = '@ai_is_you'
 
 pending_digests: dict = {}
 
@@ -91,6 +94,9 @@ def main_kb():
             ],
             [
                 {"text": "Дайджест в канал", "callback_data": "cmd_digest"}
+            ],
+            [
+                {"text": "Идеи в Notion",        "callback_data": "cmd_notion"}
             ]
         ]
     }
@@ -142,10 +148,7 @@ def generate_short_post(news_items: list) -> str:
 {news_text}"""
 
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_KEY)
-        resp = client.chat.completions.create(
-            model="gpt-4.1",
+        return chat_complete(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": prompt}
@@ -153,9 +156,8 @@ def generate_short_post(news_items: list) -> str:
             temperature=0.8,
             max_tokens=500
         )
-        return resp.choices[0].message.content.strip()
     except Exception as e:
-        logger.error(f"OpenAI short_post: {e}")
+        logger.error(f"LLM short_post: {e}")
         return f"Ошибка генерации поста: {e}"
 
 
@@ -195,10 +197,7 @@ def generate_digest(news_items: list) -> str:
 {news_text}"""
 
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_KEY)
-        resp = client.chat.completions.create(
-            model="gpt-4.1",
+        raw = chat_complete(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": prompt}
@@ -206,9 +205,8 @@ def generate_digest(news_items: list) -> str:
             temperature=0.75,
             max_tokens=700
         )
-        raw = resp.choices[0].message.content.strip()
     except Exception as e:
-        logger.error(f"OpenAI digest: {e}")
+        logger.error(f"LLM digest: {e}")
         return f"Ошибка генерации дайджеста: {e}"
 
     # Вставляем гиперссылки «Источник» после каждого тезиса
@@ -372,6 +370,24 @@ def handle_cancel(chat_id, message_id, key, cb_id):
     send(chat_id, "Что-то ещё?", reply_markup=main_kb())
 
 
+def handle_notion(chat_id, cb_id=None):
+    """Генерирует идеи для контент-плана и добавляет их в Notion."""
+    if cb_id:
+        answer_cb(cb_id, "Генерирую идеи...")
+    send(chat_id, "Анализирую тренды и генерирую идеи для контент-плана, секунду...")
+    try:
+        news = agent.fetch_news(hours_back=24) or agent.fetch_news(hours_back=72)
+        if not news:
+            send(chat_id, "Новостей не найдено. Попробуйте позже.", reply_markup=main_kb())
+            return
+        result = sync_ideas_to_notion(news)
+        report = format_notion_report(result)
+        send(chat_id, report, reply_markup=main_kb())
+    except Exception as e:
+        logger.error(f"handle_notion: {e}")
+        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+
+
 # ─── Обработка обновлений ────────────────────────────────────────────────────
 
 def process_update(update: dict):
@@ -393,6 +409,8 @@ def process_update(update: dict):
                 threading.Thread(target=handle_post,   args=(chat_id, cb_id), daemon=True).start()
             elif data == "cmd_digest":
                 threading.Thread(target=handle_digest, args=(chat_id, cb_id), daemon=True).start()
+            elif data == "cmd_notion":
+                threading.Thread(target=handle_notion, args=(chat_id, cb_id), daemon=True).start()
             elif data.startswith("approve_"):
                 key = data[len("approve_"):]
                 threading.Thread(target=handle_approve, args=(chat_id, msg_id, key, cb_id), daemon=True).start()
@@ -422,6 +440,8 @@ def process_update(update: dict):
             threading.Thread(target=handle_post,   args=(chat_id,), daemon=True).start()
         elif text == "/digest":
             threading.Thread(target=handle_digest, args=(chat_id,), daemon=True).start()
+        elif text == "/notion":
+            threading.Thread(target=handle_notion, args=(chat_id,), daemon=True).start()
         else:
             handle_start(chat_id)
 

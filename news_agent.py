@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AI News Agent - собирает новости по RSS и обрабатывает через OpenAI"""
+"""AI News Agent - собирает новости по RSS и обрабатывает через OpenAI (с fallback на OpenRouter)"""
 
 import feedparser
 import os
@@ -7,8 +7,8 @@ import re
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
-from openai import OpenAI
 import requests
+from llm_client import chat_complete
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +43,9 @@ def source_link(url: str) -> str:
 
 class NewsAgent:
     def __init__(self, openai_api_key: str, telegram_token: str, user_id: str):
-        self.client = OpenAI(api_key=openai_api_key)
+        # Ключи прокидываем в env для llm_client (если ещё не установлены)
+        if openai_api_key:
+            os.environ.setdefault('OPENAI_API_KEY', openai_api_key)
         self.telegram_token = telegram_token
         self.user_id = user_id
         logger.info("NewsAgent инициализирован")
@@ -136,8 +138,7 @@ class NewsAgent:
 Будь конкретным, избегай воды. Каждый пункт — 1-2 предложения максимум."""
 
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4.1",
+            return chat_complete(
                 messages=[
                     {"role": "system", "content": "Ты эксперт-аналитик в области ИИ. Пишешь кратко, по делу, на русском языке."},
                     {"role": "user", "content": prompt}
@@ -145,9 +146,8 @@ class NewsAgent:
                 temperature=0.7,
                 max_tokens=800
             )
-            return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"Ошибка OpenAI: {e}")
+            logger.error(f"Ошибка LLM: {e}")
             return f"Не удалось получить AI-анализ: {e}"
 
     def send_telegram(self, text: str, chat_id: str = None, parse_mode: str = "HTML") -> bool:
