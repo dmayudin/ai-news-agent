@@ -2,16 +2,22 @@
 """
 Mini App backend — Flask API.
 Endpoints:
-  GET  /api/news          — новости с переводом
-  GET  /api/analyze       — GPT-анализ
+  GET  /                    — Mini App (требует авторизации)
+  GET  /login               — страница входа
+  POST /login               — проверка логина/пароля
+  GET  /logout              — выход
+  GET  /api/news            — новости с переводом
+  GET  /api/analyze         — GPT-анализ
   GET  /api/generate?type=post|digest  — генерация поста или дайджеста
-  POST /api/publish       — публикация в Telegram канал
-  GET  /health
+  POST /api/publish         — публикация в Telegram канал
+  GET  /health              — статус (без авторизации)
 """
-import os, sys, json, logging, requests
+import os, sys, json, logging, requests, hashlib, secrets
 from datetime import datetime
+from functools import wraps
 
-from flask import Flask, jsonify, send_from_directory, request
+from flask import (Flask, jsonify, send_from_directory, request,
+                   redirect, url_for, session, make_response)
 from dotenv import load_dotenv
 
 load_dotenv('/opt/ai-news-agent/.env')
@@ -24,6 +30,26 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+
+# ── Auth config ────────────────────────────────────────────────────────────────
+APP_USERNAME = os.getenv('APP_USERNAME', 'dmayudin')
+APP_PASSWORD = os.getenv('APP_PASSWORD', 'BulochkaSobachka2026!')
+# Секретный ключ для подписи сессий — генерируется один раз при старте
+app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
+
+def _hash(pw: str) -> str:
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('authenticated'):
+            # API-запросы получают 401, браузерные — редирект на /login
+            if request.path.startswith('/api/'):
+                return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+            return redirect(url_for('login_page', next=request.path))
+        return f(*args, **kwargs)
+    return decorated
 
 BOT_TOKEN  = os.getenv('TELEGRAM_BOT_TOKEN', '')
 CHANNEL_ID = os.getenv('CHANNEL_ID', '@ai_is_you')
@@ -110,12 +136,46 @@ def fmt_item(item, tr):
         'translated':   t_ru != t_orig,
     }
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+# ── Auth routes ────────────────────────────────────────────────────────────────
+@app.route('/login', methods=['GET'])
+def login_page():
+    if session.get('authenticated'):
+        return redirect('/')
+    return send_from_directory('static', 'login.html')
+
+@app.route('/login', methods=['POST'])
+def login_submit():
+    data = request.get_json(force=True) if request.is_json else request.form
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+
+    if username == APP_USERNAME and _hash(password) == _hash(APP_PASSWORD):
+        session.permanent = True
+        session['authenticated'] = True
+        session['user'] = username
+        logger.info('Login OK: %s from %s', username, request.remote_addr)
+        if request.is_json:
+            return jsonify({'ok': True})
+        return redirect(data.get('next') or '/')
+    else:
+        logger.warning('Login FAIL: %s from %s', username, request.remote_addr)
+        if request.is_json:
+            return jsonify({'ok': False, 'error': 'Invalid credentials'}), 401
+        return redirect(url_for('login_page') + '?error=1')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
+
+# ── Protected routes ───────────────────────────────────────────────────────────
 @app.route('/')
+@login_required
 def index():
     return send_from_directory('static', 'index.html')
 
 @app.route('/api/news')
+@login_required
 def api_news():
     try:
         news  = get_news(force=request.args.get('refresh')=='1')
@@ -132,6 +192,7 @@ def api_news():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/analyze')
+@login_required
 def api_analyze():
     try:
         news = get_news()
@@ -144,25 +205,23 @@ def api_analyze():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/generate')
+@login_required
 def api_generate():
-    """Генерация поста или дайджеста на основе последних новостей."""
-    gen_type = request.args.get('type', 'post')  # 'post' или 'digest'
+    gen_type = request.args.get('type', 'post')
     try:
         news = get_news()
         if not news:
             return jsonify({'ok': False, 'error': 'No news'}), 404
 
-        # Берём переведённые заголовки, описания и ссылки
         items = news[:15]
         trs   = translate_batch(items)
         formatted_items = [fmt_item(n, trs[i]) for i, n in enumerate(items)]
 
-        # Блок новостей с ID и ссылками для промпта
         news_lines = []
         for idx, it in enumerate(formatted_items):
             if not it['title']:
                 continue
-            link = it.get('link', '')
+            link   = it.get('link', '')
             source = it.get('source', '')
             news_lines.append(
                 f"[{idx}] {it['title']}\n"
@@ -182,7 +241,7 @@ def api_generate():
                 'Используй HTML-тег <a href="..."> для ссылки.\n\n'
                 'Новости:\n' + news_block
             )
-        else:  # digest
+        else:
             prompt = (
                 'Ты — редактор Telegram-канала @ai_is_you об искусственном интеллекте.\n'
                 'Составь еженедельный дайджест на русском языке из новостей ниже.\n'
@@ -207,8 +266,8 @@ def api_generate():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/publish', methods=['POST'])
+@login_required
 def api_publish():
-    """Публикация текста в Telegram канал."""
     try:
         body = request.get_json(force=True)
         text = (body.get('text') or '').strip()
@@ -235,6 +294,7 @@ def api_publish():
 
 @app.route('/health')
 def health():
+    """Публичный health-check — без авторизации."""
     return jsonify({
         'ok':      True,
         'service': 'ai-news-webapp',
