@@ -1,0 +1,67 @@
+version: "3.9"
+
+# ============================================================
+# AI News Agent — Docker Compose
+# Сервисы:
+#   bot     — Telegram-бот (polling)
+#   agent   — Планировщик (09:00 / 16:00 / 20:00 МСК)
+# Общий volume: shared-data — для обмена данными между сервисами
+# ============================================================
+
+services:
+
+  # ── Telegram Bot ─────────────────────────────────────────
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    image: ai-news-bot:latest
+    container_name: ai-news-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      - logs:/var/log
+      - shared-data:/opt/ai-news-agent/data
+    networks:
+      - ai-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── News Agent / Scheduler ────────────────────────────────
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    image: ai-news-agent:latest
+    container_name: ai-news-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      - logs:/var/log
+      - shared-data:/opt/ai-news-agent/data
+    networks:
+      - ai-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ── Volumes ───────────────────────────────────────────────
+volumes:
+  logs:
+    driver: local
+  shared-data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────
+networks:
+  ai-net:
+    driver: bridge

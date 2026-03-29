@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Python кэш
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Виртуальные окружения
+venv/
+env/
+.env.example
+
+# Логи
+*.log
+
+# Тесты и документация
+tests/
+*.md
+!author_style.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore

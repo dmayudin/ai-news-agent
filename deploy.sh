@@ -1,70 +1,65 @@
 #!/bin/bash
-# Скрипт развертывания AI News Agent на сервере
+# ============================================================
+# deploy.sh — Деплой AI News Agent в Docker Compose
+# Запуск: bash deploy.sh
+# ============================================================
 
 set -e
 
-echo "=== Развертывание AI News Agent ==="
+APP_DIR="/opt/ai-news-agent"
+COMPOSE_FILE="$APP_DIR/docker-compose.yml"
 
-# Проверка прав администратора
-if [[ $EUID -ne 0 ]]; then
-   echo "Этот скрипт должен быть запущен от root"
-   exit 1
-fi
+echo "=== AI News Agent — Docker Deploy ==="
+echo "Директория: $APP_DIR"
+echo ""
 
-# Создание директории приложения
-echo "1. Создание директории приложения..."
-mkdir -p /opt/ai-news-agent
-cd /opt/ai-news-agent
-
-# Копирование файлов
-echo "2. Копирование файлов приложения..."
-cp news_agent.py /opt/ai-news-agent/
-cp scheduler.py /opt/ai-news-agent/
-cp requirements.txt /opt/ai-news-agent/
-cp ai-news-agent.service /etc/systemd/system/
-
-# Создание .env файла
-echo "3. Создание конфигурационного файла..."
-if [ ! -f /opt/ai-news-agent/.env ]; then
-    cp .env.example /opt/ai-news-agent/.env
-    echo "⚠️  ВАЖНО: Отредактируйте /opt/ai-news-agent/.env и добавьте ваши API ключи"
+# 1. Установка Docker, если не установлен
+if ! command -v docker &>/dev/null; then
+  echo "[1/6] Устанавливаю Docker..."
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable docker
+  systemctl start docker
+  echo "Docker установлен: $(docker --version)"
 else
-    echo "✓ Файл .env уже существует"
+  echo "[1/6] Docker уже установлен: $(docker --version)"
 fi
 
-# Установка зависимостей Python
-echo "4. Установка зависимостей Python..."
-pip3 install -r /opt/ai-news-agent/requirements.txt
+# 2. Установка Docker Compose plugin, если не установлен
+if ! docker compose version &>/dev/null; then
+  echo "[2/6] Устанавливаю Docker Compose plugin..."
+  apt-get install -y docker-compose-plugin
+else
+  echo "[2/6] Docker Compose уже установлен: $(docker compose version)"
+fi
 
-# Создание директории для логов
-echo "5. Создание директории для логов..."
-mkdir -p /var/log/ai-news-agent
-touch /var/log/ai-news-agent.log
-touch /var/log/ai-news-scheduler.log
-chmod 644 /var/log/ai-news-agent.log
-chmod 644 /var/log/ai-news-scheduler.log
+# 3. Остановка старых systemd-сервисов
+echo "[3/6] Останавливаю старые systemd-сервисы..."
+systemctl stop ai-news-agent.service 2>/dev/null && echo "  ai-news-agent.service остановлен" || echo "  ai-news-agent.service не запущен"
+systemctl stop ai-news-bot.service   2>/dev/null && echo "  ai-news-bot.service остановлен"   || echo "  ai-news-bot.service не запущен"
+systemctl disable ai-news-agent.service 2>/dev/null || true
+systemctl disable ai-news-bot.service   2>/dev/null || true
 
-# Установка прав доступа
-echo "6. Установка прав доступа..."
-chmod 755 /opt/ai-news-agent/scheduler.py
-chmod 755 /opt/ai-news-agent/news_agent.py
-chmod 644 /opt/ai-news-agent/.env
-chmod 644 /etc/systemd/system/ai-news-agent.service
+# 4. Сборка образов
+echo "[4/6] Собираю Docker-образы..."
+cd "$APP_DIR"
+docker compose build --no-cache
 
-# Перезагрузка systemd
-echo "7. Перезагрузка systemd..."
-systemctl daemon-reload
+# 5. Запуск контейнеров
+echo "[5/6] Запускаю контейнеры..."
+docker compose up -d
 
-# Включение сервиса при загрузке
-echo "8. Включение сервиса при загрузке..."
-systemctl enable ai-news-agent.service
-
+# 6. Проверка статуса
+echo "[6/6] Проверяю статус..."
+sleep 3
+docker compose ps
 echo ""
-echo "=== Развертывание завершено ==="
+echo "=== Логи (последние 20 строк) ==="
+docker compose logs --tail=20
 echo ""
-echo "Следующие шаги:"
-echo "1. Отредактируйте /opt/ai-news-agent/.env и добавьте ваши API ключи"
-echo "2. Запустите сервис: systemctl start ai-news-agent"
-echo "3. Проверьте статус: systemctl status ai-news-agent"
-echo "4. Просмотрите логи: journalctl -u ai-news-agent -f"
-echo ""
+echo "=== Деплой завершён ==="
+echo "Управление:"
+echo "  docker compose logs -f         -- следить за логами"
+echo "  docker compose ps              -- статус контейнеров"
+echo "  docker compose restart bot     -- перезапустить бот"
+echo "  docker compose restart agent   -- перезапустить агент"
+echo "  docker compose down            -- остановить всё"
