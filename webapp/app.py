@@ -8,7 +8,7 @@ import sys
 import logging
 from datetime import datetime
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 from dotenv import load_dotenv
 
 load_dotenv('/opt/ai-news-agent/.env')
@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
+# CORS для Telegram WebApp
+@app.after_request
+def add_cors(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 agent = NewsAgent(
     openai_api_key=os.getenv('OPENAI_API_KEY', ''),
     telegram_token=os.getenv('TELEGRAM_BOT_TOKEN', ''),
@@ -32,14 +39,37 @@ _news_cache = {'data': [], 'updated': None}
 CACHE_TTL = 1800  # 30 минут
 
 
-def get_cached_news():
+def get_cached_news(force_refresh: bool = False):
     now = datetime.now().timestamp()
-    if not _news_cache['data'] or (now - (_news_cache['updated'] or 0)) > CACHE_TTL:
-        logger.info("Обновляем кэш новостей...")
-        news = agent.fetch_news(hours_back=24) or agent.fetch_news(hours_back=72)
-        _news_cache['data'] = news
+    expired = not _news_cache['data'] or (now - (_news_cache['updated'] or 0)) > CACHE_TTL
+    if expired or force_refresh:
+        logger.info("Обновляем кэш новостей (force=%s)...", force_refresh)
+        news = agent.fetch_news(hours_back=24)
+        if not news:
+            news = agent.fetch_news(hours_back=72)
+        _news_cache['data'] = news or []
         _news_cache['updated'] = now
     return _news_cache['data']
+
+
+def format_item(item):
+    """Нормализуем поля новости для API."""
+    published = item.get('published', '') or ''
+    # Пробуем привести дату к ISO формату для JS Date()
+    try:
+        from email.utils import parsedate_to_datetime
+        dt = parsedate_to_datetime(published)
+        published = dt.isoformat()
+    except Exception:
+        pass  # оставляем как есть
+
+    return {
+        'title':     (item.get('title') or '').strip(),
+        'link':      item.get('link', '') or '',
+        'source':    (item.get('source') or '').strip(),
+        'published': published,
+        'summary':   (item.get('summary') or '')[:400].strip(),
+    }
 
 
 @app.route('/')
@@ -50,24 +80,17 @@ def index():
 @app.route('/api/news')
 def api_news():
     try:
-        news = get_cached_news()
-        items = []
-        for item in news[:30]:
-            items.append({
-                'title':     item.get('title', ''),
-                'link':      item.get('link', ''),
-                'source':    item.get('source', ''),
-                'published': item.get('published', ''),
-                'summary':   item.get('summary', '')[:300] if item.get('summary') else '',
-            })
+        force = request.args.get('refresh') == '1'
+        news  = get_cached_news(force_refresh=force)
+        items = [format_item(n) for n in news[:50]]
         return jsonify({
-            'ok': True,
-            'count': len(items),
+            'ok':      True,
+            'count':   len(items),
             'updated': _news_cache.get('updated'),
-            'items': items,
+            'items':   items,
         })
     except Exception as e:
-        logger.error(f"api_news error: {e}")
+        logger.error("api_news error: %s", e, exc_info=True)
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
@@ -80,13 +103,20 @@ def api_analyze():
         analysis = agent.analyze_with_ai(news[:15])
         return jsonify({'ok': True, 'analysis': analysis})
     except Exception as e:
-        logger.error(f"api_analyze error: {e}")
+        logger.error("api_analyze error: %s", e, exc_info=True)
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/health')
 def health():
-    return jsonify({'ok': True, 'service': 'ai-news-webapp'})
+    cached = len(_news_cache.get('data') or [])
+    updated = _news_cache.get('updated')
+    return jsonify({
+        'ok':           True,
+        'service':      'ai-news-webapp',
+        'cached_count': cached,
+        'updated':      updated,
+    })
 
 
 if __name__ == '__main__':
