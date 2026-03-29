@@ -1,11 +1,10 @@
-version: "3.9"
-
 # ============================================================
 # AI News Agent — Docker Compose
 # Сервисы:
-#   bot     — Telegram-бот (polling)
-#   agent   — Планировщик (09:00 / 16:00 / 20:00 МСК)
-# Общий volume: shared-data — для обмена данными между сервисами
+#   bot         — Telegram-бот (polling)
+#   agent       — Планировщик (09:00 / 16:00 / 20:00 МСК)
+#   webapp      — Mini App WebApp (Flask, порт 5000)
+#   cloudflared — Cloudflare Tunnel → https://ai.colliecore.com
 # ============================================================
 
 services:
@@ -76,6 +75,19 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ── Cloudflare Tunnel ─────────────────────────────────────
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    network_mode: host
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 # ── Volumes ───────────────────────────────────────────────
 volumes:
