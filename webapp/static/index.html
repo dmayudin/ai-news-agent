@@ -401,9 +401,20 @@ button { font-family: var(--font); cursor: pointer; }
 }
 .action-content {
   font-size: 13px; line-height: 1.75;
-  color: var(--text); white-space: pre-wrap;
+  color: var(--text);
   margin-bottom: 14px;
   max-height: 320px; overflow-y: auto;
+}
+.action-content a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(200,169,110,0.35);
+  transition: border-color 0.15s, color 0.15s;
+  font-weight: 500;
+}
+.action-content a:hover {
+  color: #e0c080;
+  border-bottom-color: rgba(200,169,110,0.7);
 }
 .action-content::-webkit-scrollbar { width: 3px; }
 .action-content::-webkit-scrollbar-track { background: transparent; }
@@ -834,7 +845,8 @@ async function doGenerate(type) {
     generatedContent = data.content;
     generatedType    = type;
     title.textContent = type==='post' ? 'Post' : 'Digest';
-    text.textContent  = generatedContent;
+    // Render HTML (links from GPT) but escape everything else
+    text.innerHTML = renderContent(generatedContent);
     panel.style.display = '';
     document.getElementById('btn-publish').disabled = false;
   } catch(e) {
@@ -881,6 +893,33 @@ function esc(s) {
   return String(s||'')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/**
+ * Render GPT-generated content:
+ * - Preserves <a href="..."> tags (source links)
+ * - Escapes all other HTML
+ * - Converts newlines to <br>
+ */
+function renderContent(raw) {
+  if (!raw) return '';
+  // Extract and protect <a href="...">...</a> tags
+  const links = [];
+  const withPlaceholders = raw.replace(/<a\s+href="([^"]+)"[^>]*>([^<]*)<\/a>/gi, (match, href, label) => {
+    const idx = links.length;
+    // Validate href — only http/https
+    const safeHref = /^https?:\/\//i.test(href) ? href : '#';
+    links.push(`<a href="${safeHref}" target="_blank" rel="noopener">${esc(label)}</a>`);
+    return `\x00LINK${idx}\x00`;
+  });
+  // Escape remaining HTML
+  let escaped = esc(withPlaceholders);
+  // Restore link placeholders
+  links.forEach((link, i) => {
+    escaped = escaped.replace(`\x00LINK${i}\x00`, link);
+  });
+  // Convert newlines to <br>
+  return escaped.replace(/\n/g, '<br>');
 }
 
 /* ── Init ── */
