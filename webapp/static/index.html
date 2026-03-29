@@ -6,7 +6,6 @@
 <title>AI News</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  /* ── CSS Variables (Telegram theme aware) ── */
   :root {
     --bg:          var(--tg-theme-bg-color, #0f0f13);
     --bg2:         var(--tg-theme-secondary-bg-color, #1a1a22);
@@ -35,97 +34,66 @@
 
   /* ── Header ── */
   .header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    position: sticky; top: 0; z-index: 100;
     background: var(--bg);
     padding: 12px 14px 10px;
     border-bottom: 1px solid var(--card-border);
   }
   .header-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px;
   }
-  .header-logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  .header-logo { display: flex; align-items: center; gap: 8px; }
   .logo-icon {
     width: 30px; height: 30px;
     background: linear-gradient(135deg, var(--accent), #a78bfa);
     border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 15px;
-    flex-shrink: 0;
+    font-size: 15px; flex-shrink: 0;
   }
-  .logo-text {
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-  }
+  .logo-text { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
   .logo-text span { color: var(--accent); }
   .header-meta {
-    font-size: 11px;
-    color: var(--hint);
-    display: flex;
-    align-items: center;
-    gap: 5px;
+    font-size: 11px; color: var(--hint);
+    display: flex; align-items: center; gap: 5px;
   }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
   .dot.loading { background: var(--hint); animation: pulse 1.2s infinite; }
+  .dot.translating { background: #fbbf24; animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
   /* ── Search ── */
-  .search-wrap {
-    position: relative;
-    margin-bottom: 10px;
-  }
+  .search-wrap { position: relative; margin-bottom: 10px; }
   .search-icon {
-    position: absolute;
-    left: 11px; top: 50%;
+    position: absolute; left: 11px; top: 50%;
     transform: translateY(-50%);
-    color: var(--hint);
-    font-size: 13px;
-    pointer-events: none;
+    color: var(--hint); font-size: 13px; pointer-events: none;
   }
   .search-input {
     width: 100%;
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-sm);
-    color: var(--text);
-    font-size: 14px;
+    color: var(--text); font-size: 14px;
     padding: 8px 34px 8px 32px;
-    outline: none;
-    transition: border-color 0.2s;
+    outline: none; transition: border-color 0.2s;
     -webkit-appearance: none;
   }
   .search-input::placeholder { color: var(--hint); }
   .search-input:focus { border-color: var(--accent); }
   .search-clear {
-    position: absolute;
-    right: 9px; top: 50%;
+    position: absolute; right: 9px; top: 50%;
     transform: translateY(-50%);
     background: none; border: none;
-    color: var(--hint);
-    font-size: 15px;
-    cursor: pointer;
-    display: none;
-    line-height: 1;
-    padding: 2px;
+    color: var(--hint); font-size: 15px;
+    cursor: pointer; display: none; line-height: 1; padding: 2px;
   }
   .search-clear.visible { display: block; }
 
   /* ── Filters ── */
   .filters {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
+    display: flex; gap: 6px;
+    overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
   }
   .filters::-webkit-scrollbar { display: none; }
   .filter-btn {
@@ -133,60 +101,79 @@
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: 20px;
-    color: var(--hint);
-    font-size: 12px;
-    font-weight: 500;
-    padding: 5px 11px;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
+    color: var(--hint); font-size: 12px; font-weight: 500;
+    padding: 5px 11px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
   }
   .filter-btn:active { transform: scale(0.95); }
   .filter-btn.active {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--accent); border-color: var(--accent);
     color: var(--accent-text);
   }
   .filter-count {
     display: inline-block;
     background: rgba(255,255,255,0.2);
-    border-radius: 8px;
-    font-size: 10px;
-    padding: 0 4px;
-    margin-left: 3px;
-    line-height: 15px;
-    vertical-align: middle;
+    border-radius: 8px; font-size: 10px;
+    padding: 0 4px; margin-left: 3px;
+    line-height: 15px; vertical-align: middle;
   }
-  .filter-btn:not(.active) .filter-count {
-    background: rgba(255,255,255,0.1);
-  }
+  .filter-btn:not(.active) .filter-count { background: rgba(255,255,255,0.1); }
 
   /* ── Content ── */
   .content { padding: 10px 12px 0; }
 
   /* ── Stats bar ── */
   .stats-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 2px 8px;
-    font-size: 12px;
-    color: var(--hint);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 2px 8px; font-size: 12px; color: var(--hint);
   }
   .stats-count { font-weight: 600; color: var(--text); }
   .refresh-link {
     background: none; border: none;
-    color: var(--hint); font-size: 12px;
-    cursor: pointer; padding: 0;
+    color: var(--hint); font-size: 12px; cursor: pointer; padding: 0;
   }
   .refresh-link:active { color: var(--accent); }
 
-  /* ── News Grid ── */
-  .news-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  /* ── Translate banner ── */
+  .translate-banner {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.25);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px; margin-bottom: 10px;
+    font-size: 12px; color: #fbbf24;
   }
+  .translate-banner .spin-sm {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(251,191,36,0.3);
+    border-top-color: #fbbf24;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* ── News Grid ── */
+  .news-grid { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── Skeleton ── */
+  .skeleton-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 13px 13px 13px 16px;
+    animation: fadeIn 0.3s ease both;
+  }
+  .skel {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .skel-row { height: 11px; margin-bottom: 7px; }
+  .skel-title { height: 14px; width: 85%; margin-bottom: 8px; }
+  .skel-line1 { height: 11px; width: 100%; margin-bottom: 5px; }
+  .skel-line2 { height: 11px; width: 70%; }
 
   /* ── News Card ── */
   .news-card {
@@ -197,13 +184,11 @@
     cursor: pointer;
     transition: transform 0.12s, border-color 0.15s;
     animation: fadeIn 0.3s ease both;
-    position: relative;
-    overflow: hidden;
+    position: relative; overflow: hidden;
   }
   .news-card::before {
     content: '';
-    position: absolute;
-    top: 0; left: 0;
+    position: absolute; top: 0; left: 0;
     width: 3px; height: 100%;
     background: var(--card-accent, var(--accent));
     opacity: 0.75;
@@ -215,57 +200,42 @@
   }
 
   .card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 6px;
-    margin-bottom: 7px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 6px; margin-bottom: 7px;
   }
   .card-badges {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
-    flex: 1;
-    min-width: 0;
+    display: flex; align-items: center; gap: 5px;
+    flex-wrap: wrap; flex: 1; min-width: 0;
   }
   .badge {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 6px;
-    letter-spacing: 0.2px;
-    white-space: nowrap;
+    font-size: 10px; font-weight: 600;
+    padding: 2px 6px; border-radius: 6px;
+    letter-spacing: 0.2px; white-space: nowrap;
   }
   .badge-source {
-    background: rgba(255,255,255,0.07);
-    color: var(--hint);
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    background: rgba(255,255,255,0.07); color: var(--hint);
+    max-width: 120px; overflow: hidden; text-overflow: ellipsis;
   }
   .badge-category {
     background: var(--cat-bg, rgba(124,110,245,0.18));
     color: var(--cat-color, var(--accent));
   }
+  .badge-translated {
+    background: rgba(74,222,128,0.15);
+    color: #4ade80;
+    font-size: 9px;
+  }
   .card-date {
-    font-size: 10px;
-    color: var(--hint);
-    white-space: nowrap;
-    flex-shrink: 0;
-    margin-top: 1px;
+    font-size: 10px; color: var(--hint);
+    white-space: nowrap; flex-shrink: 0; margin-top: 1px;
   }
 
   .card-title {
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.4;
-    color: var(--text);
-    margin-bottom: 6px;
+    font-size: 14px; font-weight: 600;
+    line-height: 1.4; color: var(--text); margin-bottom: 6px;
   }
   .card-summary {
-    font-size: 12px;
-    color: var(--hint);
+    font-size: 12px; color: var(--hint);
     line-height: 1.55;
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -273,21 +243,55 @@
     overflow: hidden;
     margin-bottom: 9px;
   }
+
+  /* ── Expanded card (full view) ── */
+  .news-card.expanded .card-summary {
+    -webkit-line-clamp: unset;
+    overflow: visible;
+  }
   .card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
   }
   .card-link {
-    font-size: 12px;
-    color: var(--link);
-    text-decoration: none;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 3px;
+    font-size: 12px; color: var(--link);
+    text-decoration: none; font-weight: 500;
+    display: flex; align-items: center; gap: 3px;
   }
   .card-link:active { opacity: 0.7; }
+  .card-toggle {
+    background: none; border: none;
+    color: var(--hint); font-size: 11px;
+    cursor: pointer; padding: 0;
+  }
+  .card-toggle:active { color: var(--accent); }
+
+  /* ── Original text toggle ── */
+  .orig-wrap {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border-left: 2px solid rgba(255,255,255,0.12);
+    display: none;
+  }
+  .orig-wrap.visible { display: block; }
+  .orig-label {
+    font-size: 9px; font-weight: 600;
+    color: var(--hint); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .orig-title {
+    font-size: 11px; color: var(--hint);
+    line-height: 1.45; margin-bottom: 3px;
+  }
+  .orig-summary {
+    font-size: 11px; color: var(--hint);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
   /* ── Category colors ── */
   .cat-llm     { --cat-bg: rgba(124,110,245,0.18); --cat-color: #a78bfa; --card-accent: #7c6ef5; }
@@ -300,13 +304,9 @@
 
   /* ── States ── */
   .state-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 48px 24px;
-    text-align: center;
-    gap: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 48px 24px; text-align: center; gap: 10px;
   }
   .state-icon { font-size: 38px; }
   .state-title { font-size: 15px; font-weight: 600; }
@@ -324,15 +324,10 @@
   .analysis-wrap { padding: 4px 0; }
   .analysis-btn {
     width: 100%;
-    background: var(--accent);
-    color: var(--accent-text);
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-weight: 600;
-    padding: 13px;
-    cursor: pointer;
-    margin-bottom: 12px;
+    background: var(--accent); color: var(--accent-text);
+    border: none; border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 600;
+    padding: 13px; cursor: pointer; margin-bottom: 12px;
     transition: opacity 0.2s;
   }
   .analysis-btn:disabled { opacity: 0.6; cursor: default; }
@@ -340,17 +335,13 @@
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: var(--radius);
-    padding: 15px;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--text);
-    white-space: pre-wrap;
+    padding: 15px; font-size: 13px;
+    line-height: 1.7; color: var(--text); white-space: pre-wrap;
   }
 
   /* ── Bottom nav ── */
   .bottom-nav {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
+    position: fixed; bottom: 0; left: 0; right: 0;
     background: var(--bg);
     border-top: 1px solid var(--card-border);
     display: flex;
@@ -358,19 +349,11 @@
     z-index: 100;
   }
   .nav-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    background: none;
-    border: none;
-    color: var(--hint);
-    font-size: 10px;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 4px 0;
-    transition: color 0.15s;
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+    background: none; border: none;
+    color: var(--hint); font-size: 10px; font-weight: 500;
+    cursor: pointer; padding: 4px 0; transition: color 0.15s;
   }
   .nav-btn .nav-icon { font-size: 20px; line-height: 1; }
   .nav-btn.active { color: var(--accent); }
@@ -378,9 +361,7 @@
   /* ── Search highlight ── */
   mark {
     background: rgba(124,110,245,0.35);
-    color: var(--text);
-    border-radius: 2px;
-    padding: 0 1px;
+    color: var(--text); border-radius: 2px; padding: 0 1px;
   }
 </style>
 </head>
@@ -399,21 +380,14 @@
     </div>
   </div>
 
-  <!-- Search (hidden until news loaded) -->
   <div class="search-wrap" id="search-wrap" style="display:none">
     <span class="search-icon">🔍</span>
-    <input
-      class="search-input"
-      id="search-input"
-      type="search"
-      placeholder="Поиск по новостям..."
-      autocomplete="off"
-      oninput="onSearch(this.value)"
-    >
+    <input class="search-input" id="search-input" type="search"
+      placeholder="Поиск по новостям..." autocomplete="off"
+      oninput="onSearch(this.value)">
     <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
   </div>
 
-  <!-- Filters (hidden until news loaded) -->
   <div class="filters" id="filters-bar" style="display:none">
     <button class="filter-btn active" data-cat="all" onclick="setFilter('all',this)">
       Все <span class="filter-count" id="cnt-all">0</span>
@@ -441,22 +415,29 @@
 
 <!-- ── Content ── -->
 <div class="content" id="main-content">
-  <!-- News tab -->
   <div id="tab-news">
     <div class="stats-bar" id="stats-bar" style="display:none">
       <span>Показано: <span class="stats-count" id="stats-shown">0</span> из <span id="stats-total">0</span></span>
       <button class="refresh-link" onclick="loadNews(true)">↻ обновить</button>
     </div>
+    <div id="translate-banner" style="display:none" class="translate-banner">
+      <div class="spin-sm"></div>
+      <span>Переводим новости на русский через GPT...</span>
+    </div>
     <div class="news-grid" id="news-list">
-      <div class="state-box">
-        <div class="spinner"></div>
-        <div class="state-title">Загружаю новости...</div>
-        <div class="state-sub">Это займёт несколько секунд</div>
+      <!-- skeleton -->
+      <div id="skeleton-list">
+        ${[1,2,3,4,5].map(() => `
+        <div class="skeleton-card">
+          <div class="skel skel-row" style="width:55%"></div>
+          <div class="skel skel-title"></div>
+          <div class="skel skel-line1"></div>
+          <div class="skel skel-line2"></div>
+        </div>`).join('')}
       </div>
     </div>
   </div>
 
-  <!-- Analysis tab -->
   <div id="tab-analysis" style="display:none">
     <div class="analysis-wrap">
       <button class="analysis-btn" id="analyze-btn" onclick="loadAnalysis()">
@@ -478,11 +459,9 @@
 </div>
 
 <script>
-// ── Telegram WebApp ───────────────────────────────────────────────────────────
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// ── State ─────────────────────────────────────────────────────────────────────
 let allNews      = [];
 let activeFilter = 'all';
 let searchQuery  = '';
@@ -491,7 +470,7 @@ let searchQuery  = '';
 const CAT_RULES = [
   { id: 'llm',      kw: ['gpt','llm','claude','gemini','mistral','llama','qwen','deepseek',
       'language model','transformer','chatgpt','openai','anthropic','большая языковая',
-      'нейросет','языковая модель','o1','o3','o4','grok','perplexity'] },
+      'нейросет','языковая модель','o1','o3','o4','grok','perplexity','языков'] },
   { id: 'robots',   kw: ['robot','humanoid','boston dynamics','figure','optimus','tesla bot',
       'physical ai','робот','гуманоид','манипулятор','дрон','drone','embodied'] },
   { id: 'product',  kw: ['launch','release','update','product','app','feature','api','sdk',
@@ -505,7 +484,7 @@ const CAT_RULES = [
 ];
 
 function detectCategory(item) {
-  const text = ((item.title || '') + ' ' + (item.summary || '')).toLowerCase();
+  const text = ((item.title||'') + ' ' + (item.summary||'') + ' ' + (item.title_orig||'')).toLowerCase();
   for (const cat of CAT_RULES) {
     if (cat.kw.some(kw => text.includes(kw))) return cat.id;
   }
@@ -513,13 +492,13 @@ function detectCategory(item) {
 }
 
 const CAT_META = {
-  llm:      { label: 'LLM',           emoji: '🧠' },
-  robots:   { label: 'Роботы',        emoji: '🤖' },
-  product:  { label: 'Продукты',      emoji: '🚀' },
-  research: { label: 'Исследования',  emoji: '🔬' },
-  business: { label: 'Бизнес',        emoji: '💼' },
-  safety:   { label: 'Безопасность',  emoji: '🛡' },
-  other:    { label: 'Другое',        emoji: '📌' },
+  llm:      { label: 'LLM',          emoji: '🧠' },
+  robots:   { label: 'Роботы',       emoji: '🤖' },
+  product:  { label: 'Продукты',     emoji: '🚀' },
+  research: { label: 'Исследования', emoji: '🔬' },
+  business: { label: 'Бизнес',       emoji: '💼' },
+  safety:   { label: 'Безопасность', emoji: '🛡' },
+  other:    { label: 'Другое',       emoji: '📌' },
 };
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -529,9 +508,9 @@ function showTab(name) {
     document.getElementById('nav-' + t).classList.toggle('active', t === name);
   });
   const isNews = name === 'news';
-  document.getElementById('search-wrap').style.display  = (isNews && allNews.length) ? '' : 'none';
-  document.getElementById('filters-bar').style.display  = (isNews && allNews.length) ? '' : 'none';
-  document.getElementById('stats-bar').style.display    = (isNews && allNews.length) ? '' : 'none';
+  document.getElementById('search-wrap').style.display = (isNews && allNews.length) ? '' : 'none';
+  document.getElementById('filters-bar').style.display = (isNews && allNews.length) ? '' : 'none';
+  document.getElementById('stats-bar').style.display   = (isNews && allNews.length) ? '' : 'none';
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
@@ -558,12 +537,10 @@ function onSearch(q) {
   document.getElementById('search-clear').classList.toggle('visible', q.length > 0);
   renderFiltered();
 }
-
 function clearSearch() {
   document.getElementById('search-input').value = '';
   onSearch('');
 }
-
 function highlight(text, q) {
   if (!q) return esc(text);
   const safeText = esc(text);
@@ -574,14 +551,12 @@ function highlight(text, q) {
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderFiltered() {
   let items = allNews;
-
-  if (activeFilter !== 'all') {
-    items = items.filter(n => n._cat === activeFilter);
-  }
+  if (activeFilter !== 'all') items = items.filter(n => n._cat === activeFilter);
   if (searchQuery) {
     items = items.filter(n =>
       (n.title   || '').toLowerCase().includes(searchQuery) ||
       (n.summary || '').toLowerCase().includes(searchQuery) ||
+      (n.title_orig || '').toLowerCase().includes(searchQuery) ||
       (n.source  || '').toLowerCase().includes(searchQuery)
     );
   }
@@ -602,27 +577,47 @@ function renderFiltered() {
 
   const q = searchQuery;
   list.innerHTML = items.map((item, i) => {
-    const cat   = CAT_META[item._cat] || CAT_META.other;
-    const delay = Math.min(i * 0.035, 0.45).toFixed(2);
+    const cat    = CAT_META[item._cat] || CAT_META.other;
+    const delay  = Math.min(i * 0.03, 0.4).toFixed(2);
     const dateStr = formatDate(item.published);
+    const hasOrig = item.translated && item.title_orig && item.title_orig !== item.title;
+    const cardId  = 'card-' + i;
+
     return `
-    <div class="news-card cat-${item._cat}" style="animation-delay:${delay}s">
+    <div class="news-card cat-${item._cat}" id="${cardId}" style="animation-delay:${delay}s">
       <div class="card-header">
         <div class="card-badges">
           <span class="badge badge-source">${esc(item.source || 'Источник')}</span>
           <span class="badge badge-category">${cat.emoji} ${cat.label}</span>
+          ${item.translated ? '<span class="badge badge-translated">🌐 RU</span>' : ''}
         </div>
         ${dateStr ? `<span class="card-date">${dateStr}</span>` : ''}
       </div>
       <div class="card-title">${highlight(item.title || '', q)}</div>
       ${item.summary ? `<div class="card-summary">${highlight(item.summary, q)}</div>` : ''}
+      ${hasOrig ? `
+      <div class="orig-wrap" id="orig-${cardId}">
+        <div class="orig-label">Оригинал</div>
+        <div class="orig-title">${esc(item.title_orig)}</div>
+        ${item.summary_orig ? `<div class="orig-summary">${esc(item.summary_orig)}</div>` : ''}
+      </div>` : ''}
       <div class="card-footer">
         ${item.link
           ? `<a class="card-link" href="${esc(item.link)}" target="_blank">Читать статью →</a>`
           : '<span></span>'}
+        ${hasOrig
+          ? `<button class="card-toggle" onclick="toggleOrig('${cardId}',this)">Оригинал ▾</button>`
+          : ''}
       </div>
     </div>`;
   }).join('');
+}
+
+function toggleOrig(cardId, btn) {
+  const orig = document.getElementById('orig-' + cardId);
+  if (!orig) return;
+  const visible = orig.classList.toggle('visible');
+  btn.textContent = visible ? 'Скрыть ▴' : 'Оригинал ▾';
 }
 
 // ── Date formatting ───────────────────────────────────────────────────────────
@@ -641,27 +636,40 @@ function formatDate(raw) {
 
 // ── Load news ─────────────────────────────────────────────────────────────────
 async function loadNews(forceRefresh = false) {
-  const list = document.getElementById('news-list');
   const dot  = document.getElementById('status-dot');
   const meta = document.getElementById('header-meta-text');
+  const list = document.getElementById('news-list');
 
-  dot.classList.add('loading');
+  dot.className = 'dot loading';
   meta.textContent = 'Загрузка...';
   document.getElementById('search-wrap').style.display  = 'none';
   document.getElementById('filters-bar').style.display  = 'none';
   document.getElementById('stats-bar').style.display    = 'none';
+  document.getElementById('translate-banner').style.display = 'none';
 
-  list.innerHTML = `
-    <div class="state-box">
-      <div class="spinner"></div>
-      <div class="state-title">Загружаю новости...</div>
-      <div class="state-sub">Это займёт несколько секунд</div>
-    </div>`;
+  // Показываем скелетон
+  list.innerHTML = Array(5).fill(0).map(() => `
+    <div class="skeleton-card">
+      <div class="skel skel-row" style="width:55%"></div>
+      <div class="skel skel-title"></div>
+      <div class="skel skel-line1"></div>
+      <div class="skel skel-line2"></div>
+    </div>`).join('');
+
+  // Показываем баннер перевода через 1 секунду
+  const translateTimer = setTimeout(() => {
+    dot.className = 'dot translating';
+    meta.textContent = 'Переводим...';
+    document.getElementById('translate-banner').style.display = 'flex';
+  }, 1000);
 
   try {
     const url  = forceRefresh ? '/api/news?refresh=1' : '/api/news';
     const r    = await fetch(url);
     const data = await r.json();
+    clearTimeout(translateTimer);
+    document.getElementById('translate-banner').style.display = 'none';
+
     if (!data.ok) throw new Error(data.error || 'Ошибка API');
 
     allNews = (data.items || []).map(item => ({ ...item, _cat: detectCategory(item) }));
@@ -673,14 +681,17 @@ async function loadNews(forceRefresh = false) {
     document.getElementById('filters-bar').style.display  = '';
     document.getElementById('stats-bar').style.display    = '';
 
-    dot.classList.remove('loading');
+    dot.className = 'dot';
     const updated = data.updated
       ? new Date(data.updated * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})
       : '';
-    meta.textContent = `${allNews.length} новостей · ${updated}`;
+    const translatedCount = allNews.filter(n => n.translated).length;
+    meta.textContent = `${allNews.length} новостей · ${updated}${translatedCount ? ` · 🌐 ${translatedCount} переведено` : ''}`;
 
   } catch(e) {
-    dot.classList.remove('loading');
+    clearTimeout(translateTimer);
+    document.getElementById('translate-banner').style.display = 'none';
+    dot.className = 'dot loading';
     meta.textContent = 'Ошибка загрузки';
     list.innerHTML = `
       <div class="state-box">
@@ -725,10 +736,8 @@ async function loadAnalysis() {
 // ── Utils ─────────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s || '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
