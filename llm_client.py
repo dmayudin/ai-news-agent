@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LLM Client с автоматическим fallback: OpenAI gpt-4.1 → OpenRouter claude-sonnet-4-5
+LLM Client с автоматическим fallback: OpenAI gpt-4.1-mini → OpenRouter claude-3-haiku
 """
 
 import logging
@@ -12,16 +12,15 @@ logger = logging.getLogger(__name__)
 OPENAI_KEY      = os.getenv('OPENAI_API_KEY', '')
 OPENROUTER_KEY  = os.getenv('OPENROUTER_API_KEY', '')
 
-OPENAI_MODEL    = "gpt-4.1"
-FALLBACK_MODEL  = "anthropic/claude-sonnet-4-5"
+OPENAI_MODEL    = "gpt-4.1-mini"
+FALLBACK_MODEL  = "anthropic/claude-3-haiku"
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 
-def chat_complete(messages: list, temperature: float = 0.75, max_tokens: int = 800) -> str:
+def chat_complete(messages: list, temperature: float = 0.75, max_tokens: int = 1200) -> str:
     """
     Выполняет chat completion с автоматическим fallback.
-    Сначала пробует OpenAI gpt-4.1, при ошибке — OpenRouter claude-sonnet-4-5.
-    Возвращает текст ответа или бросает исключение если оба провайдера недоступны.
+    Сначала пробует OpenAI gpt-4.1-mini, при ошибке — OpenRouter claude-3-haiku.
     """
     # --- Попытка 1: OpenAI ---
     if OPENAI_KEY:

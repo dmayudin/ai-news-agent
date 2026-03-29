@@ -54,6 +54,29 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ── Mini App WebApp ─────────────────────────────────────
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.webapp
+    image: ai-news-webapp:latest
+    container_name: ai-news-webapp
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Europe/Moscow
+    ports:
+      - "5000:5000"
+    volumes:
+      - shared-data:/opt/ai-news-agent/data
+    networks:
+      - ai-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 # ── Volumes ───────────────────────────────────────────────
 volumes:
   logs:

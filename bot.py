@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """
-AI News Bot — Telegram бот с интерактивными кнопками
-Команды: /start /news /post /digest
+AI News Bot v2 — Telegram бот с natural language chat, inline-кнопками и Mini App.
 """
-
+import json
+import logging
 import os
 import re
-import sys
-import logging
 import threading
 import time
-import requests
 from datetime import datetime
+from html import escape as html_escape
+from typing import Optional
+
+import requests
 from dotenv import load_dotenv
 
 load_dotenv('/opt/ai-news-agent/.env')
+
+from llm_client import chat_complete
+from news_agent import NewsAgent, html_escape, source_link
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,21 +30,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-sys.path.insert(0, '/opt/ai-news-agent')
-from news_agent import NewsAgent, html_escape, source_link
-from llm_client import chat_complete
-from notion_sync import sync_ideas_to_notion, format_notion_report
+BOT_TOKEN  = os.getenv('TELEGRAM_BOT_TOKEN', '')
+USER_ID    = int(os.getenv('TELEGRAM_USER_ID', '0'))
+CHANNEL_ID = os.getenv('CHANNEL_ID', '@ai_is_you')
+WEBAPP_URL = os.getenv('WEBAPP_URL', '')
 
-BOT_TOKEN        = os.getenv('TELEGRAM_BOT_TOKEN')
-USER_ID          = int(os.getenv('TELEGRAM_USER_ID'))
-OPENAI_KEY       = os.getenv('OPENAI_API_KEY')
-OPENROUTER_KEY   = os.getenv('OPENROUTER_API_KEY')
-CHANNEL_ID       = '@ai_is_you'
+agent = NewsAgent(
+    openai_api_key = os.getenv('OPENAI_API_KEY', ''),
+    telegram_token = BOT_TOKEN,
+    user_id        = str(USER_ID),
+)
 
 pending_digests: dict = {}
-
-agent = NewsAgent(OPENAI_KEY, BOT_TOKEN, str(USER_ID))
-
+chat_history: list = []
+CHAT_HISTORY_LIMIT = 10
 
 # ─── Telegram API ─────────────────────────────────────────────────────────────
 
@@ -83,70 +86,76 @@ def answer_cb(callback_query_id, text: str = ""):
     tg("answerCallbackQuery", callback_query_id=callback_query_id, text=text)
 
 
-# ─── Клавиатуры ──────────────────────────────────────────────────────────────
+def send_action(chat_id, action="typing"):
+    tg("sendChatAction", chat_id=chat_id, action=action)
+
+
+# ─── Клавиатуры ───────────────────────────────────────────────────────────────
 
 def main_kb():
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "Полная сводка",    "callback_data": "cmd_news"},
-                {"text": "Короткий пост",    "callback_data": "cmd_post"}
-            ],
-            [
-                {"text": "Дайджест в канал", "callback_data": "cmd_digest"}
-            ],
-            [
-                {"text": "Идеи в Notion",        "callback_data": "cmd_notion"}
-            ]
-        ]
-    }
+    buttons = [
+        [
+            {"text": "📰 Новости сейчас",    "callback_data": "cmd_news"},
+            {"text": "✍️ Написать пост",      "callback_data": "cmd_post"},
+        ],
+        [
+            {"text": "📊 Дайджест в канал",   "callback_data": "cmd_digest"},
+            {"text": "📅 Идеи в Notion",      "callback_data": "cmd_notion"},
+        ],
+        [
+            {"text": "⚙️ Статус системы",     "callback_data": "cmd_status"},
+            {"text": "🧹 Очистить чат",        "callback_data": "cmd_clear"},
+        ],
+    ]
+    if WEBAPP_URL:
+        buttons.append([
+            {"text": "🌐 Лента новостей", "web_app": {"url": WEBAPP_URL}}
+        ])
+    return {"inline_keyboard": buttons}
 
 
 def approve_kb(key: str):
-    return {
-        "inline_keyboard": [[
-            {"text": "Опубликовать в канал", "callback_data": f"approve_{key}"},
-            {"text": "Отмена",               "callback_data": f"cancel_{key}"}
-        ]]
-    }
+    return {"inline_keyboard": [[
+        {"text": "✅ Опубликовать",  "callback_data": f"approve_{key}"},
+        {"text": "✏️ Переписать",    "callback_data": f"rewrite_{key}"},
+        {"text": "❌ Отменить",      "callback_data": f"cancel_{key}"},
+    ]]}
 
 
-# ─── AI генерация ─────────────────────────────────────────────────────────────
+def news_item_kb(link: str, idx: int):
+    return {"inline_keyboard": [
+        [{"text": "🔗 Читать полностью", "url": link}],
+        [{"text": "✍️ Написать пост об этом", "callback_data": f"post_about_{idx}"}],
+    ]}
+
+
+# ─── Генерация контента ───────────────────────────────────────────────────────
 
 def generate_short_post(news_items: list) -> str:
-    """
-    Короткий авторский пост в стиле Дмитрия Юдина (@ai_is_you).
-    Живой, разговорный, с личной позицией. Без эмодзи и хэштегов.
-    """
     if not news_items:
         return "Свежих новостей об ИИ пока нет."
-
     news_text = "\n".join(
         f"{i}. {item['title']}" for i, item in enumerate(news_items[:10], 1)
     )
-
     system_prompt = """Ты — Дмитрий Юдин. Руководитель ИИ-направления Cloud.ru, автор канала @ai_is_you.
-Пишешь живо, по-человечески — как объясняешь коллеге за кофе, а не как пресс-релиз.
+Пишешь живо, по-человечески — как объясняешь коллеге за кофе.
 
-Правила голоса:
-— Начинай с «На связи Дима Юдин» — это твоя фирменная подводка
+Правила:
+— Начинай с «На связи Дима Юдин»
 — Первая содержательная строка — удар без вводных: тезис, парадокс или неожиданный угол
 — Разговорные конструкции: «ну ок», «честно говоря», «по факту», «вот в чём штука»
-— Короткие абзацы — 1–3 предложения. Иногда одно слово как абзац
-— Конкретика обязательна: цифры, названия компаний, продуктов, источников
-— Скептицизм к хайпу — это твоя фирменная черта. «Звучит красиво. Но есть нюанс.»
-— Честность про минусы без смягчений
+— Короткие абзацы — 1–3 предложения
+— Конкретика: цифры, названия компаний, продуктов
+— Скептицизм к хайпу — твоя фирменная черта
 — Финал — вывод или наблюдение. Никаких вопросов к аудитории
-— Ноль эмодзи. Ноль хэштегов. Ноль маркированных списков"""
-
+— Ноль эмодзи. Ноль хэштегов. Ноль маркированных списков
+— ПЕРЕВОДИ все заголовки на русский язык"""
     prompt = f"""Напиши короткий авторский пост (150–200 слов) по следующим новостям об ИИ.
-Ты Дмитрий Юдин — практик, не журналист. Пишешь от первого лица.
 Выбери 1–2 самых важных события, добавь свой угол. Не пересказывай заголовки.
 Начни с «На связи Дима Юдин», потом сразу в суть.
 
 НОВОСТИ:
 {news_text}"""
-
     try:
         return chat_complete(
             messages=[
@@ -162,31 +171,23 @@ def generate_short_post(news_items: list) -> str:
 
 
 def generate_digest(news_items: list) -> str:
-    """
-    Дайджест для Telegram-канала в стиле Дмитрия Юдина.
-    Живой, конкретный. Без эмодзи. Ссылки — гиперссылки 'Источник'.
-    """
     if not news_items:
         return "Свежих новостей об ИИ пока нет."
-
     today     = datetime.now().strftime('%d.%m.%Y')
     news_text = "\n".join(
         f"{i}. {item['title']}" for i, item in enumerate(news_items[:12], 1)
     )
-
     system_prompt = """Ты — Дмитрий Юдин. Руководитель ИИ-направления Cloud.ru, автор канала @ai_is_you.
 Пишешь дайджест как живой человек — не как новостной агрегатор.
-Каждый тезис — это не пересказ заголовка, а суть + твой угол: что произошло, почему это важно.
-Разговорный тон, конкретика, скептицизм к хайпу. Ноль эмодзи. Ноль хэштегов."""
-
+Каждый тезис — суть + твой угол. Разговорный тон, конкретика, скептицизм к хайпу.
+Ноль эмодзи. Ноль хэштегов. ПЕРЕВОДИ заголовки на русский."""
     prompt = f"""Создай дайджест новостей об ИИ за {today}.
 
 Формат (строго):
 Строка 1: На связи Дима Юдин. Вот что важного произошло в ИИ сегодня.
 Строка 2: пустая
 Строки 3–N: тезисы. Каждый — ОДНА строка: номер, точка, пробел, предложение.
-  Тезис пиши живо: не «Компания X выпустила Y», а что это реально значит и почему важно.
-  Можно добавить короткую оценку: «и это меняет расклад», «звучит громко, но нюанс есть», «наконец-то».
+  Тезис пиши живо: не «Компания X выпустила Y», а что это реально значит.
   5–7 тезисов, только самые важные.
 После тезисов: пустая строка
 Последняя строка: @ai_is_you
@@ -195,7 +196,6 @@ def generate_digest(news_items: list) -> str:
 
 НОВОСТИ:
 {news_text}"""
-
     try:
         raw = chat_complete(
             messages=[
@@ -209,7 +209,6 @@ def generate_digest(news_items: list) -> str:
         logger.error(f"LLM digest: {e}")
         return f"Ошибка генерации дайджеста: {e}"
 
-    # Вставляем гиперссылки «Источник» после каждого тезиса
     lines = raw.split('\n')
     result_lines = []
     news_idx = 0
@@ -224,60 +223,43 @@ def generate_digest(news_items: list) -> str:
             news_idx += 1
         else:
             result_lines.append(html_escape(stripped))
-
     return '\n'.join(result_lines)
-
-
-# ─── Форматирование сводки (без эмодзи) ──────────────────────────────────────
-
-def format_full_digest(news_items: list, ai_analysis: str) -> list[str]:
-    """Возвращает список сообщений для полной сводки без эмодзи."""
-    now = datetime.now().strftime('%d.%m.%Y %H:%M')
-    messages = []
-
-    # Блок 1: AI-анализ
-    msg = (
-        f"<b>AI-АНАЛИЗ НОВОСТЕЙ ОБ ИИ</b>\n"
-        f"<i>{now} МСК</i>\n"
-        f"{'─' * 30}\n\n"
-        f"{html_escape(ai_analysis)}"
-    )
-    messages.append(msg)
-
-    # Блок 2+: список новостей
-    header = f"<b>НОВОСТИ ЗА ПЕРИОД — {len(news_items)} материалов</b>\n\n"
-    current = header
-    for i, item in enumerate(news_items[:15], 1):
-        title  = html_escape(item['title'])
-        src    = html_escape(item['source'])
-        date   = item['published']
-        link   = item['link']
-
-        line = f"{i}. <b>{title}</b>\n"
-        line += f"   <i>{src}"
-        if date:
-            line += f" · {date}"
-        line += f"</i>  {source_link(link)}\n\n"
-
-        if len(current) + len(line) > 3800:
-            messages.append(current)
-            current = ""
-        current += line
-
-    if current:
-        messages.append(current)
-
-    return messages
 
 
 # ─── Обработчики ─────────────────────────────────────────────────────────────
 
 def handle_start(chat_id):
     text = (
-        "<b>AI News Agent</b>\n\n"
-        "Собираю актуальные новости об искусственном интеллекте "
-        "из 7 источников и отправляю сводки в <b>09:00, 16:00 и 20:00 МСК</b>.\n\n"
-        "Выберите действие:"
+        "👋 <b>AI News Bot v2</b>\n\n"
+        "Слежу за новостями об ИИ из 9 источников, перевожу на русский и помогаю создавать контент.\n\n"
+        "<b>Умею:</b>\n"
+        "• Собирать и анализировать новости\n"
+        "• Переводить заголовки на русский\n"
+        "• Писать посты и дайджесты в стиле @ai_is_you\n"
+        "• Отвечать на вопросы об ИИ\n\n"
+        "Выбери действие или просто напиши мне что-нибудь 👇"
+    )
+    send(chat_id, text, reply_markup=main_kb())
+
+
+def handle_status(chat_id, cb_id=None):
+    if cb_id:
+        answer_cb(cb_id, "Проверяю...")
+    send_action(chat_id)
+    try:
+        chat_complete([{"role": "user", "content": "ping"}], temperature=0, max_tokens=5)
+        llm_status = "✅ LLM работает"
+    except Exception as e:
+        llm_status = f"❌ LLM: {str(e)[:50]}"
+    me = tg("getMe")
+    tg_status = f"✅ @{me['result']['username']}" if me.get("ok") else "❌ Telegram API"
+    text = (
+        f"<b>⚙️ Статус системы</b>\n\n"
+        f"{tg_status}\n"
+        f"{llm_status}\n\n"
+        f"<b>Канал:</b> {CHANNEL_ID}\n"
+        f"<b>Расписание:</b> 09:00, 16:00, 20:00 МСК\n"
+        f"<b>История чата:</b> {len(chat_history)} сообщений"
     )
     send(chat_id, text, reply_markup=main_kb())
 
@@ -285,97 +267,107 @@ def handle_start(chat_id):
 def handle_news(chat_id, cb_id=None):
     if cb_id:
         answer_cb(cb_id, "Собираю новости...")
-    send(chat_id, "Собираю полную сводку новостей. Подождите 1–2 минуты...")
+    send_action(chat_id)
+    send(chat_id, "🔍 Собираю свежие новости об ИИ...")
     try:
-        news = agent.fetch_news(hours_back=8) or agent.fetch_news(hours_back=48)
+        news = agent.fetch_news(hours_back=24) or agent.fetch_news(hours_back=72)
         if not news:
-            send(chat_id, "Свежих новостей не найдено. Попробуйте позже.", reply_markup=main_kb())
+            send(chat_id, "😔 Новостей не найдено. Попробуйте позже.", reply_markup=main_kb())
             return
+        send_action(chat_id)
+        send(chat_id, f"✅ Нашёл {len(news)} новостей. Анализирую через GPT...")
         ai_analysis = agent.analyze_with_ai(news)
-        for msg in format_full_digest(news, ai_analysis):
-            send(chat_id, msg)
-        send(chat_id, "Сводка сформирована.", reply_markup=main_kb())
+        now = datetime.now().strftime('%d.%m.%Y %H:%M')
+        msg = (
+            f"<b>🤖 AI-СВОДКА НОВОСТЕЙ</b>\n"
+            f"<i>{now} МСК · {len(news)} новостей</i>\n"
+            f"{'─' * 28}\n\n"
+            f"{html_escape(ai_analysis)}"
+        )
+        send(chat_id, msg)
+
+        # Топ-5 новостей с кнопками
+        send(chat_id, "<b>📋 ТОП-5 НОВОСТЕЙ:</b>")
+        for i, item in enumerate(news[:5], 1):
+            title_ru = agent.translate_title(item.get('title', ''))
+            title_orig = html_escape(item.get('title', ''))
+            src  = html_escape(item.get('source', ''))
+            date = item.get('published', '')
+            link = item.get('link', '')
+            if title_ru != item.get('title', ''):
+                entry = f"<b>{html_escape(title_ru)}</b>\n<i>{title_orig}</i>\n<i>{src}"
+            else:
+                entry = f"<b>{title_orig}</b>\n<i>{src}"
+            if date:
+                entry += f" · {date}"
+            entry += "</i>"
+            send(chat_id, entry, reply_markup=news_item_kb(link, i - 1))
+
+        send(chat_id, "Что дальше?", reply_markup=main_kb())
     except Exception as e:
         logger.error(f"handle_news: {e}")
-        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
-def handle_post(chat_id, cb_id=None):
+def handle_post(chat_id, cb_id=None, news_idx=None):
     if cb_id:
         answer_cb(cb_id, "Генерирую пост...")
-    send(chat_id, "Генерирую короткий пост, секунду...")
+    send_action(chat_id)
+    send(chat_id, "✍️ Генерирую пост для канала...")
     try:
-        news = agent.fetch_news(hours_back=8) or agent.fetch_news(hours_back=48)
-        post_text = generate_short_post(news)
-        # Пост — plain text от GPT, экранируем и отправляем
-        send(chat_id, html_escape(post_text), reply_markup=main_kb())
+        news = agent.fetch_news(hours_back=24) or agent.fetch_news(hours_back=72)
+        if not news:
+            send(chat_id, "😔 Новостей не найдено.", reply_markup=main_kb())
+            return
+        if news_idx is not None and 0 <= news_idx < len(news):
+            post_news = [news[news_idx]]
+        else:
+            post_news = news
+        send_action(chat_id)
+        post_text = generate_short_post(post_news)
+        key = str(int(time.time()))
+        pending_digests[key] = post_text
+        preview = html_escape(post_text[:3500])
+        send(
+            chat_id,
+            f"<b>✍️ Готовый пост:</b>\n\n{preview}\n\n<i>Опубликовать в {CHANNEL_ID}?</i>",
+            reply_markup=approve_kb(key)
+        )
     except Exception as e:
         logger.error(f"handle_post: {e}")
-        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
 def handle_digest(chat_id, cb_id=None):
     if cb_id:
         answer_cb(cb_id, "Готовлю дайджест...")
-    send(chat_id, "Готовлю дайджест для канала, секунду...")
+    send_action(chat_id)
+    send(chat_id, "📊 Готовлю дайджест для канала...")
     try:
         news = agent.fetch_news(hours_back=8) or agent.fetch_news(hours_back=48)
+        if not news:
+            send(chat_id, "😔 Новостей не найдено.", reply_markup=main_kb())
+            return
+        send_action(chat_id)
         digest_html = generate_digest(news)
-
         key = str(int(time.time()))
         pending_digests[key] = digest_html
-
         preview = (
-            f"<b>ПРЕВЬЮ ДАЙДЖЕСТА ДЛЯ КАНАЛА {CHANNEL_ID}</b>\n"
-            f"{'─' * 30}\n\n"
-            f"{digest_html}\n\n"
-            f"{'─' * 30}\n"
-            "Опубликовать в канал?"
+            f"<b>ПРЕВЬЮ ДАЙДЖЕСТА ДЛЯ {CHANNEL_ID}</b>\n{'─' * 30}\n\n"
+            f"{digest_html}\n\n{'─' * 30}\nОпубликовать в канал?"
         )
         send(chat_id, preview, reply_markup=approve_kb(key))
     except Exception as e:
         logger.error(f"handle_digest: {e}")
-        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
-
-
-def handle_approve(chat_id, message_id, key, cb_id):
-    answer_cb(cb_id, "Публикую...")
-    digest_html = pending_digests.pop(key, None)
-    if not digest_html:
-        edit_msg(chat_id, message_id, "Дайджест не найден или уже опубликован.")
-        return
-    try:
-        result = tg("sendMessage",
-                    chat_id=CHANNEL_ID,
-                    text=digest_html,
-                    parse_mode="HTML",
-                    disable_web_page_preview=True)
-        if result.get("ok"):
-            edit_msg(chat_id, message_id, f"Дайджест опубликован в <b>{CHANNEL_ID}</b>.")
-            send(chat_id, "Что-то ещё?", reply_markup=main_kb())
-        else:
-            err = html_escape(result.get("description", "неизвестная ошибка"))
-            edit_msg(chat_id, message_id,
-                     f"Ошибка публикации: {err}\n\n"
-                     "Убедитесь, что бот добавлен в канал как администратор.")
-    except Exception as e:
-        logger.error(f"handle_approve: {e}")
-        edit_msg(chat_id, message_id, f"Ошибка: {html_escape(str(e))}")
-
-
-def handle_cancel(chat_id, message_id, key, cb_id):
-    answer_cb(cb_id, "Отменено")
-    pending_digests.pop(key, None)
-    edit_msg(chat_id, message_id, "Публикация отменена.")
-    send(chat_id, "Что-то ещё?", reply_markup=main_kb())
+        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
 def handle_notion(chat_id, cb_id=None):
-    """Генерирует идеи для контент-плана и добавляет их в Notion."""
     if cb_id:
         answer_cb(cb_id, "Генерирую идеи...")
-    send(chat_id, "Анализирую тренды и генерирую идеи для контент-плана, секунду...")
+    send(chat_id, "📅 Анализирую тренды и генерирую идеи для контент-плана...")
     try:
+        from notion_sync import sync_ideas_to_notion, format_notion_report
         news = agent.fetch_news(hours_back=24) or agent.fetch_news(hours_back=72)
         if not news:
             send(chat_id, "Новостей не найдено. Попробуйте позже.", reply_markup=main_kb())
@@ -385,10 +377,70 @@ def handle_notion(chat_id, cb_id=None):
         send(chat_id, report, reply_markup=main_kb())
     except Exception as e:
         logger.error(f"handle_notion: {e}")
-        send(chat_id, f"Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
+        send(chat_id, f"❌ Ошибка: {html_escape(str(e))}", reply_markup=main_kb())
 
 
-# ─── Обработка обновлений ────────────────────────────────────────────────────
+def handle_approve(chat_id, message_id, key, cb_id):
+    answer_cb(cb_id, "Публикую...")
+    text = pending_digests.pop(key, None)
+    if not text:
+        edit_msg(chat_id, message_id, "❌ Пост не найден или уже опубликован.")
+        return
+    result = tg("sendMessage", chat_id=CHANNEL_ID, text=text,
+                parse_mode="HTML", disable_web_page_preview=True)
+    if result.get("ok"):
+        edit_msg(chat_id, message_id, f"✅ Опубликовано в {CHANNEL_ID}!")
+        send(chat_id, "Что-то ещё?", reply_markup=main_kb())
+    else:
+        err = html_escape(result.get("description", "неизвестная ошибка"))
+        edit_msg(chat_id, message_id, f"❌ Ошибка публикации: {err}")
+
+
+def handle_rewrite(chat_id, message_id, key, cb_id):
+    answer_cb(cb_id, "Переписываю...")
+    pending_digests.pop(key, None)
+    threading.Thread(target=handle_post, args=(chat_id,), daemon=True).start()
+
+
+def handle_cancel(chat_id, message_id, key, cb_id):
+    answer_cb(cb_id, "Отменено")
+    pending_digests.pop(key, None)
+    edit_msg(chat_id, message_id, "❌ Публикация отменена.")
+    send(chat_id, "Что-то ещё?", reply_markup=main_kb())
+
+
+# ─── Natural Language Chat ────────────────────────────────────────────────────
+
+def handle_chat(chat_id, user_text: str):
+    global chat_history
+    send_action(chat_id)
+    chat_history.append({"role": "user", "content": user_text})
+    if len(chat_history) > CHAT_HISTORY_LIMIT:
+        chat_history = chat_history[-CHAT_HISTORY_LIMIT:]
+
+    system_prompt = (
+        "Ты AI News Bot — умный ассистент, который следит за новостями об ИИ. "
+        "Ты работаешь в Telegram и помогаешь пользователю:\n"
+        "- Отвечаешь на вопросы об ИИ, нейросетях, технологиях\n"
+        "- Объясняешь термины и концепции простым языком\n"
+        "- Помогаешь создавать контент\n"
+        "- Анализируешь тренды\n\n"
+        "Отвечай кратко (2-4 абзаца), по делу, на отличном русском языке. "
+        "Если пользователь хочет посмотреть новости, написать пост или дайджест — "
+        "скажи что нужно нажать кнопку в меню. "
+        "Используй эмодзи умеренно."
+    )
+    try:
+        messages = [{"role": "system", "content": system_prompt}] + chat_history
+        response = chat_complete(messages=messages, temperature=0.8, max_tokens=600)
+        chat_history.append({"role": "assistant", "content": response})
+        send(chat_id, html_escape(response), reply_markup=main_kb())
+    except Exception as e:
+        logger.error(f"handle_chat error: {e}")
+        send(chat_id, "😔 Не удалось получить ответ. Попробуйте ещё раз.", reply_markup=main_kb())
+
+
+# ─── Обработка обновлений ─────────────────────────────────────────────────────
 
 def process_update(update: dict):
     try:
@@ -398,11 +450,9 @@ def process_update(update: dict):
             data    = cq.get("data", "")
             chat_id = cq["message"]["chat"]["id"]
             msg_id  = cq["message"]["message_id"]
-
             if cq["from"]["id"] != USER_ID:
                 answer_cb(cb_id, "Нет доступа")
                 return
-
             if   data == "cmd_news":
                 threading.Thread(target=handle_news,   args=(chat_id, cb_id), daemon=True).start()
             elif data == "cmd_post":
@@ -411,27 +461,38 @@ def process_update(update: dict):
                 threading.Thread(target=handle_digest, args=(chat_id, cb_id), daemon=True).start()
             elif data == "cmd_notion":
                 threading.Thread(target=handle_notion, args=(chat_id, cb_id), daemon=True).start()
+            elif data == "cmd_status":
+                threading.Thread(target=handle_status, args=(chat_id, cb_id), daemon=True).start()
+            elif data == "cmd_clear":
+                global chat_history
+                chat_history = []
+                answer_cb(cb_id, "История очищена")
+                send(chat_id, "🧹 История диалога очищена.", reply_markup=main_kb())
             elif data.startswith("approve_"):
                 key = data[len("approve_"):]
                 threading.Thread(target=handle_approve, args=(chat_id, msg_id, key, cb_id), daemon=True).start()
+            elif data.startswith("rewrite_"):
+                key = data[len("rewrite_"):]
+                threading.Thread(target=handle_rewrite, args=(chat_id, msg_id, key, cb_id), daemon=True).start()
             elif data.startswith("cancel_"):
                 key = data[len("cancel_"):]
                 handle_cancel(chat_id, msg_id, key, cb_id)
+            elif data.startswith("post_about_"):
+                idx = int(data[len("post_about_"):])
+                answer_cb(cb_id, "Пишу пост...")
+                threading.Thread(target=handle_post, args=(chat_id, None, idx), daemon=True).start()
             else:
                 answer_cb(cb_id)
             return
 
         if "message" not in update:
             return
-
         msg     = update["message"]
         chat_id = msg["chat"]["id"]
         from_id = msg.get("from", {}).get("id")
         text    = msg.get("text", "").strip()
-
         if from_id != USER_ID:
             return
-
         if   text in ("/start", "/menu"):
             handle_start(chat_id)
         elif text == "/news":
@@ -442,40 +503,39 @@ def process_update(update: dict):
             threading.Thread(target=handle_digest, args=(chat_id,), daemon=True).start()
         elif text == "/notion":
             threading.Thread(target=handle_notion, args=(chat_id,), daemon=True).start()
-        else:
-            handle_start(chat_id)
-
+        elif text == "/status":
+            threading.Thread(target=handle_status, args=(chat_id,), daemon=True).start()
+        elif text == "/clear":
+            chat_history = []
+            send(chat_id, "🧹 История диалога очищена.", reply_markup=main_kb())
+        elif text:
+            threading.Thread(target=handle_chat, args=(chat_id, text), daemon=True).start()
     except Exception as e:
         logger.error(f"process_update error: {e}")
 
 
-# ─── Polling ─────────────────────────────────────────────────────────────────
+# ─── Polling ──────────────────────────────────────────────────────────────────
 
 def run_polling():
     logger.info("Бот запущен, начинаю polling...")
     offset = None
-
     while True:
         try:
             params = {"timeout": 30, "allowed_updates": ["message", "callback_query"]}
             if offset:
                 params["offset"] = offset
-
-            r = requests.get(
+            r    = requests.get(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
                 params=params, timeout=40
             )
             data = r.json()
-
             if not data.get("ok"):
                 logger.error(f"getUpdates error: {data}")
                 time.sleep(5)
                 continue
-
             for upd in data.get("result", []):
                 offset = upd["update_id"] + 1
                 process_update(upd)
-
         except requests.exceptions.Timeout:
             continue
         except Exception as e:
@@ -484,5 +544,5 @@ def run_polling():
 
 
 if __name__ == "__main__":
-    logger.info(f"AI News Bot запущен. USER_ID={USER_ID}, CHANNEL={CHANNEL_ID}")
+    logger.info(f"AI News Bot v2 запущен. USER_ID={USER_ID}, CHANNEL={CHANNEL_ID}")
     run_polling()

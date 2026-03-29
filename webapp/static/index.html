@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>AI News</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg:       var(--tg-theme-bg-color, #1a1a2e);
+      --bg2:      var(--tg-theme-secondary-bg-color, #16213e);
+      --text:     var(--tg-theme-text-color, #e0e0e0);
+      --hint:     var(--tg-theme-hint-color, #8899aa);
+      --link:     var(--tg-theme-link-color, #4fc3f7);
+      --btn:      var(--tg-theme-button-color, #0f3460);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+      --accent:   #4fc3f7;
+      --radius:   12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+
+    /* Header */
+    .header {
+      background: var(--bg2);
+      padding: 14px 16px 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .header h1 span { color: var(--accent); }
+    .header-meta {
+      font-size: 12px;
+      color: var(--hint);
+      margin-top: 2px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .tab {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: transparent;
+      color: var(--hint);
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+
+    /* Content */
+    .content { padding: 12px 16px; }
+
+    /* News card */
+    .news-card {
+      background: var(--bg2);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .news-card:active { transform: scale(0.98); }
+
+    .news-source {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .news-title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .news-summary {
+      font-size: 13px;
+      color: var(--hint);
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .news-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .news-date {
+      font-size: 11px;
+      color: var(--hint);
+    }
+    .news-link {
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 4px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+    }
+
+    /* Analysis block */
+    .analysis-block {
+      background: var(--bg2);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(79,195,247,0.2);
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .analysis-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--btn);
+      color: var(--btn-text);
+      border: none;
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: opacity 0.2s;
+    }
+    .analysis-btn:disabled { opacity: 0.5; cursor: default; }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--hint);
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(79,195,247,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-msg {
+      background: rgba(255,80,80,0.1);
+      border: 1px solid rgba(255,80,80,0.3);
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: center;
+      color: #ff6b6b;
+      font-size: 14px;
+    }
+
+    /* Count badge */
+    .count-badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    /* Refresh btn */
+    .refresh-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--hint);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      float: right;
+      margin-top: 2px;
+    }
+    .refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🤖 <span>AI</span> News</h1>
+  <div class="header-meta" id="header-meta">Загрузка...</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('news')">Новости</button>
+  <button class="tab" onclick="showTab('analysis')">AI-анализ</button>
+</div>
+
+<div class="content">
+  <!-- News tab -->
+  <div id="tab-news">
+    <div id="news-list">
+      <div class="loading">
+        <div class="spinner"></div>
+        Загружаю новости...
+      </div>
+    </div>
+  </div>
+
+  <!-- Analysis tab -->
+  <div id="tab-analysis" style="display:none">
+    <button class="analysis-btn" id="analyze-btn" onclick="loadAnalysis()">
+      🔍 Получить AI-анализ
+    </button>
+    <div id="analysis-content"></div>
+  </div>
+</div>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  let newsData = [];
+  let analysisLoaded = false;
+
+  // ─── Tabs ──────────────────────────────────────────────────────────────────
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-news').style.display     = name === 'news'     ? '' : 'none';
+    document.getElementById('tab-analysis').style.display = name === 'analysis' ? '' : 'none';
+  }
+
+  // ─── Load news ─────────────────────────────────────────────────────────────
+  async function loadNews(forceRefresh = false) {
+    const list = document.getElementById('news-list');
+    list.innerHTML = '<div class="loading"><div class="spinner"></div>Загружаю новости...</div>';
+
+    try {
+      const url = forceRefresh ? '/api/news?refresh=1' : '/api/news';
+      const r = await fetch(url);
+      const data = await r.json();
+
+      if (!data.ok) throw new Error(data.error || 'Ошибка API');
+
+      newsData = data.items;
+      renderNews(newsData);
+
+      const updated = data.updated ? new Date(data.updated * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) : '';
+      document.getElementById('header-meta').innerHTML =
+        `${data.count} новостей · обновлено ${updated} &nbsp;` +
+        `<button class="refresh-btn" onclick="loadNews(true)">↻ обновить</button>`;
+    } catch(e) {
+      list.innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+      document.getElementById('header-meta').textContent = 'Ошибка загрузки';
+    }
+  }
+
+  function renderNews(items) {
+    const list = document.getElementById('news-list');
+    if (!items.length) {
+      list.innerHTML = '<div class="loading">Новостей не найдено</div>';
+      return;
+    }
+    list.innerHTML = items.map((item, i) => `
+      <div class="news-card">
+        <div class="news-source">${escHtml(item.source)}</div>
+        <div class="news-title">${escHtml(item.title)}</div>
+        ${item.summary ? `<div class="news-summary">${escHtml(item.summary)}</div>` : ''}
+        <div class="news-footer">
+          <span class="news-date">${escHtml(item.published || '')}</span>
+          ${item.link ? `<a class="news-link" href="${escHtml(item.link)}" target="_blank">Читать →</a>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ─── Load analysis ─────────────────────────────────────────────────────────
+  async function loadAnalysis() {
+    const btn     = document.getElementById('analyze-btn');
+    const content = document.getElementById('analysis-content');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Анализирую...';
+    content.innerHTML = '<div class="loading"><div class="spinner"></div>GPT анализирует новости...</div>';
+
+    try {
+      const r = await fetch('/api/analyze');
+      const data = await r.json();
+      if (!data.ok) throw new Error(data.error || 'Ошибка API');
+      content.innerHTML = `<div class="analysis-block">${escHtml(data.analysis)}</div>`;
+      btn.textContent = '🔄 Обновить анализ';
+      btn.disabled = false;
+    } catch(e) {
+      content.innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+      btn.textContent = '🔍 Попробовать снова';
+      btn.disabled = false;
+    }
+  }
+
+  // ─── Utils ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ─── Init ──────────────────────────────────────────────────────────────────
+  loadNews();
+</script>
+</body>
+</html>
