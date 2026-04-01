@@ -1,12 +1,11 @@
 // Service Worker for AI News PWA
 // Стратегия: кэшируем статику (shell), API-запросы всегда идут в сеть
 
-const CACHE_NAME = 'ai-news-v1';
+const CACHE_NAME = 'ai-news-v2';
 const SHELL_ASSETS = [
   '/',
-  '/login',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  '/icons/icon-192.png?v=2',
+  '/icons/icon-512.png?v=2',
   '/manifest.json'
 ];
 
@@ -19,7 +18,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// Активация: удаляем старые кэши
+// Активация: удаляем старые кэши (включая ai-news-v1)
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
