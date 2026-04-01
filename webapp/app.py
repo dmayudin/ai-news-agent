@@ -18,6 +18,7 @@ import os, sys, json, logging, requests, hashlib, secrets
 from datetime import datetime, timezone
 from functools import wraps
 from zoneinfo import ZoneInfo
+from urllib.parse import urlencode
 
 from flask import (Flask, jsonify, send_from_directory, request,
                    redirect, url_for, session, make_response)
@@ -55,8 +56,107 @@ def login_required(f):
 BOT_TOKEN  = os.getenv('TELEGRAM_BOT_TOKEN', '')
 CHANNEL_ID = os.getenv('CHANNEL_ID', '@ai_is_you')
 
+# ── LinkedIn config ────────────────────────────────────────────────────────────
+LINKEDIN_CLIENT_ID     = os.getenv('LINKEDIN_CLIENT_ID', '')
+LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET', '')
+LINKEDIN_REDIRECT_URI  = os.getenv('LINKEDIN_REDIRECT_URI', 'https://ai.colliecore.com/linkedin/callback')
+LINKEDIN_TOKENS_FILE   = '/opt/ai-news-agent/data/linkedin_tokens.json'
+
 # Путь к файлу очереди отложенных публикаций (shared-data volume)
 SCHEDULE_FILE = '/opt/ai-news-agent/data/scheduled_posts.json'
+
+# ── LinkedIn helpers ───────────────────────────────────────────────────────────
+
+def _li_load_tokens() -> dict:
+    try:
+        if os.path.exists(LINKEDIN_TOKENS_FILE):
+            with open(LINKEDIN_TOKENS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning('_li_load_tokens error: %s', e)
+    return {}
+
+def _li_save_tokens(data: dict):
+    try:
+        os.makedirs(os.path.dirname(LINKEDIN_TOKENS_FILE), exist_ok=True)
+        with open(LINKEDIN_TOKENS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error('_li_save_tokens error: %s', e)
+
+def _li_is_connected() -> bool:
+    return bool(_li_load_tokens().get('access_token'))
+
+def _li_get_valid_token() -> str:
+    from datetime import timedelta
+    t = _li_load_tokens()
+    if not t.get('access_token'):
+        raise RuntimeError('LinkedIn not connected')
+    expires_at = t.get('expires_at')
+    if expires_at:
+        try:
+            exp = datetime.fromisoformat(expires_at)
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= exp - timedelta(minutes=5):
+                logger.info('LinkedIn token expired, refreshing...')
+                t = _li_refresh_token(t)
+        except Exception as e:
+            logger.warning('Token expiry check: %s', e)
+    return t['access_token']
+
+def _li_refresh_token(t: dict) -> dict:
+    from datetime import timedelta
+    resp = requests.post('https://www.linkedin.com/oauth/v2/accessToken', data={
+        'grant_type':    'refresh_token',
+        'refresh_token': t['refresh_token'],
+        'client_id':     LINKEDIN_CLIENT_ID,
+        'client_secret': LINKEDIN_CLIENT_SECRET,
+    }, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    if 'access_token' not in data:
+        raise RuntimeError(f'LinkedIn refresh error: {data}')
+    data['expires_at'] = (datetime.now(timezone.utc) + timedelta(seconds=data.get('expires_in', 5183944))).isoformat()
+    if not data.get('refresh_token'):
+        data['refresh_token'] = t.get('refresh_token', '')
+    data['sub']   = t.get('sub', '')
+    data['name']  = t.get('name', '')
+    data['email'] = t.get('email', '')
+    _li_save_tokens(data)
+    return data
+
+def _li_publish(text: str) -> dict:
+    token = _li_get_valid_token()
+    t = _li_load_tokens()
+    sub = t.get('sub', '')
+    if not sub:
+        raise RuntimeError('LinkedIn person URN not found — re-authorize')
+    payload = {
+        'author': f'urn:li:person:{sub}',
+        'lifecycleState': 'PUBLISHED',
+        'specificContent': {
+            'com.linkedin.ugc.ShareContent': {
+                'shareCommentary': {'text': text},
+                'shareMediaCategory': 'NONE'
+            }
+        },
+        'visibility': {'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'}
+    }
+    resp = requests.post(
+        'https://api.linkedin.com/v2/ugcPosts',
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'X-Restli-Protocol-Version': '2.0.0',
+        },
+        json=payload, timeout=20,
+    )
+    if resp.status_code == 201:
+        post_id = resp.headers.get('X-RestLi-Id', resp.headers.get('x-restli-id', ''))
+        logger.info('Published to LinkedIn: %s', post_id)
+        return {'ok': True, 'post_id': post_id}
+    raise RuntimeError(f'LinkedIn API {resp.status_code}: {resp.text}')
 
 @app.after_request
 def cors(r):
@@ -418,6 +518,139 @@ def api_schedule():
     except Exception as e:
         logger.error('api_schedule: %s', e, exc_info=True)
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+# ── LinkedIn OAuth routes ───────────────────────────────────────────────────────────
+
+@app.route('/linkedin/auth')
+@login_required
+def linkedin_auth():
+    """Redirect to LinkedIn OAuth authorization page."""
+    if not LINKEDIN_CLIENT_ID or not LINKEDIN_CLIENT_SECRET:
+        return 'LinkedIn credentials not configured', 500
+    state = secrets.token_hex(16)
+    session['linkedin_state'] = state
+    params = {
+        'response_type': 'code',
+        'client_id':     LINKEDIN_CLIENT_ID,
+        'redirect_uri':  LINKEDIN_REDIRECT_URI,
+        'state':         state,
+        'scope':         'openid profile email w_member_social',
+    }
+    auth_url = 'https://www.linkedin.com/oauth/v2/authorization?' + urlencode(params)
+    return redirect(auth_url)
+
+
+@app.route('/linkedin/callback')
+def linkedin_callback():
+    """OAuth callback: exchange code for tokens and save them."""
+    error = request.args.get('error')
+    if error:
+        desc = request.args.get('error_description', error)
+        logger.error('LinkedIn OAuth error: %s', desc)
+        return f'<h2>LinkedIn ошибка</h2><p>{desc}</p><a href="/">&#8592; Назад</a>', 400
+
+    code  = request.args.get('code', '')
+    state = request.args.get('state', '')
+    # Проверяем state если сессия ещё жива
+    expected_state = session.get('linkedin_state')
+    if expected_state and state != expected_state:
+        return '<h2>Ошибка state</h2><p>CSRF check failed</p>', 400
+
+    if not code:
+        return '<h2>Ошибка</h2><p>No authorization code received</p>', 400
+
+    try:
+        from datetime import timedelta
+        # Exchange code for tokens
+        resp = requests.post('https://www.linkedin.com/oauth/v2/accessToken', data={
+            'grant_type':    'authorization_code',
+            'code':          code,
+            'redirect_uri':  LINKEDIN_REDIRECT_URI,
+            'client_id':     LINKEDIN_CLIENT_ID,
+            'client_secret': LINKEDIN_CLIENT_SECRET,
+        }, timeout=15)
+        resp.raise_for_status()
+        token_data = resp.json()
+        if 'access_token' not in token_data:
+            raise RuntimeError(f'Token exchange failed: {token_data}')
+
+        expires_in = token_data.get('expires_in', 5183944)
+        token_data['expires_at'] = (
+            datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        ).isoformat()
+
+        # Get user info (sub = person ID)
+        ui_resp = requests.get('https://api.linkedin.com/v2/userinfo', headers={
+            'Authorization': f'Bearer {token_data["access_token"]}'
+        }, timeout=10)
+        ui = ui_resp.json() if ui_resp.ok else {}
+        token_data['sub']   = ui.get('sub', '')
+        token_data['name']  = ui.get('name', '')
+        token_data['email'] = ui.get('email', '')
+
+        _li_save_tokens(token_data)
+        session.pop('linkedin_state', None)
+
+        name = token_data.get('name', 'Пользователь')
+        logger.info('LinkedIn connected for %s', name)
+
+        return f'''
+<!DOCTYPE html><html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LinkedIn подключён</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:"DM Sans",sans-serif;background:#0A0A0A;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}}.card{{background:#141414;border:1px solid #222;border-radius:12px;padding:40px;max-width:400px;width:100%;text-align:center}}.icon{{font-size:48px;margin-bottom:16px}}.title{{font-size:24px;font-weight:700;margin-bottom:8px}}.sub{{color:#888;margin-bottom:24px}}.name{{color:#E8FF47;font-weight:600;font-size:18px;margin-bottom:24px}}.btn{{display:inline-block;background:#E8FF47;color:#0A0A0A;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:15px}}</style>
+</head><body>
+<div class="card">
+  <div class="icon">✅</div>
+  <div class="title">LinkedIn подключён</div>
+  <div class="sub">Авторизация успешно завершена</div>
+  <div class="name">{name}</div>
+  <a href="/" class="btn">← Вернуться в приложение</a>
+</div>
+</body></html>
+'''
+    except Exception as e:
+        logger.error('linkedin_callback error: %s', e, exc_info=True)
+        return f'<h2>Ошибка</h2><p>{e}</p><a href="/">&#8592; Назад</a>', 500
+
+
+@app.route('/api/linkedin/status')
+@login_required
+def api_linkedin_status():
+    """Return LinkedIn connection status."""
+    t = _li_load_tokens()
+    connected = bool(t.get('access_token'))
+    return jsonify({
+        'ok': True,
+        'connected': connected,
+        'name':  t.get('name', ''),
+        'email': t.get('email', ''),
+    })
+
+
+@app.route('/api/linkedin/disconnect', methods=['POST'])
+@login_required
+def api_linkedin_disconnect():
+    """Clear LinkedIn tokens."""
+    _li_save_tokens({})
+    return jsonify({'ok': True})
+
+
+@app.route('/api/publish_linkedin', methods=['POST'])
+@login_required
+def api_publish_linkedin():
+    """Publish a post to LinkedIn."""
+    try:
+        body = request.get_json(force=True)
+        text = (body.get('text') or '').strip()
+        if not text:
+            return jsonify({'ok': False, 'error': 'Empty text'}), 400
+        result = _li_publish(text)
+        return jsonify(result)
+    except Exception as e:
+        logger.error('api_publish_linkedin: %s', e, exc_info=True)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 
 @app.route('/health')
 def health():

@@ -504,6 +504,36 @@ button { font-family:var(--font-sans); cursor:pointer }
 .publish-result.sch { background:rgba(96,165,250,0.08);  color:var(--blue);  border:1px solid rgba(96,165,250,0.2) }
 .publish-result svg { width:16px; height:16px; flex-shrink:0 }
 
+/* ── PLATFORM SELECTOR ── */
+.platform-tabs {
+  display:flex; gap:6px; margin-bottom:12px;
+}
+.platform-tab {
+  flex:1; padding:8px 4px; border-radius:var(--r-sm);
+  border:1px solid var(--border2); background:var(--surface);
+  color:var(--muted); font-size:12px; font-weight:600;
+  cursor:pointer; transition:all 0.18s; text-align:center;
+  letter-spacing:0.02em; font-family:var(--font-sans);
+}
+.platform-tab.active {
+  border-color:var(--accent); background:rgba(232,255,71,0.08);
+  color:var(--accent);
+}
+.li-status {
+  font-size:11px; color:var(--muted2); margin-bottom:10px;
+  display:flex; align-items:center; gap:6px;
+}
+.li-status-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--muted2); flex-shrink:0;
+}
+.li-status-dot.on { background:#4ade80 }
+.li-connect-btn {
+  font-size:11px; color:var(--accent); text-decoration:underline;
+  background:none; border:none; cursor:pointer; padding:0;
+  font-family:var(--font-sans);
+}
+
 /* ── SELECTION BAR ── */
 .sel-bar {
   position: fixed; bottom: 80px;
@@ -673,6 +703,16 @@ mark {
           </div>
           <div class="action-content" id="content-text" contenteditable="true" oninput="onContentEdit()"></div>
           <div class="divider"></div>
+          <div class="platform-tabs">
+            <button class="platform-tab active" id="tab-tg" onclick="setPlatform('telegram')">Telegram</button>
+            <button class="platform-tab" id="tab-li" onclick="setPlatform('linkedin')">LinkedIn</button>
+            <button class="platform-tab" id="tab-both" onclick="setPlatform('both')">Both</button>
+          </div>
+          <div id="li-status-row" class="li-status" style="display:none">
+            <div class="li-status-dot" id="li-dot"></div>
+            <span id="li-status-text">Not connected</span>
+            <button class="li-connect-btn" id="li-connect-btn" onclick="connectLinkedIn()">Connect</button>
+          </div>
           <button class="primary-btn" id="btn-publish" onclick="doPublish()">Publish to Channel</button>
           <div class="schedule-row">
             <input class="time-input" type="time" id="schedule-time" value="10:00">
@@ -721,6 +761,66 @@ if (tg) { tg.ready(); tg.expand(); }
 let allNews = [], activeFilter = 'all', searchQuery = '';
 let analysisText = '', generatedContent = '', generatedType = '';
 let selectedIds = new Set();
+let activePlatform = 'telegram';
+let liConnected = false;
+
+// ── LinkedIn platform logic ──
+async function checkLinkedInStatus() {
+  try {
+    const r = await fetch('/api/linkedin/status');
+    const d = await r.json();
+    liConnected = d.connected;
+    const dot = document.getElementById('li-dot');
+    const txt = document.getElementById('li-status-text');
+    const btn = document.getElementById('li-connect-btn');
+    if (liConnected) {
+      dot.classList.add('on');
+      txt.textContent = d.name || 'Connected';
+      btn.textContent = 'Disconnect';
+      btn.onclick = disconnectLinkedIn;
+    } else {
+      dot.classList.remove('on');
+      txt.textContent = 'Not connected';
+      btn.textContent = 'Connect';
+      btn.onclick = connectLinkedIn;
+    }
+  } catch(e) { console.warn('LinkedIn status check failed:', e); }
+}
+
+function connectLinkedIn() {
+  window.open('/linkedin/auth', '_blank', 'width=600,height=700');
+  // Poll for connection after popup
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/linkedin/status').catch(()=>null);
+    if (!r) return;
+    const d = await r.json();
+    if (d.connected) { clearInterval(poll); checkLinkedInStatus(); }
+  }, 2000);
+  setTimeout(() => clearInterval(poll), 120000);
+}
+
+async function disconnectLinkedIn() {
+  if (!confirm('Disconnect LinkedIn?')) return;
+  await fetch('/api/linkedin/disconnect', {method:'POST'});
+  liConnected = false;
+  checkLinkedInStatus();
+}
+
+function setPlatform(p) {
+  activePlatform = p;
+  ['telegram','linkedin','both'].forEach(id => {
+    const tab = document.getElementById('tab-'+id.replace('telegram','tg').replace('linkedin','li').replace('both','both'));
+    if (tab) tab.classList.toggle('active', id===p);
+  });
+  const liRow = document.getElementById('li-status-row');
+  liRow.style.display = (p==='linkedin'||p==='both') ? 'flex' : 'none';
+  if (p==='linkedin'||p==='both') checkLinkedInStatus();
+  // Update publish button label
+  const btn = document.getElementById('btn-publish');
+  if (p==='telegram') btn.textContent='Publish to Channel';
+  else if (p==='linkedin') btn.textContent='Publish to LinkedIn';
+  else btn.textContent='Publish to Both';
+}
 
 const CATS = [
   {id:'llm',kw:['gpt','llm','claude','gemini','mistral','llama','qwen','deepseek','language model','transformer','chatgpt','openai','anthropic','o1','o3','o4','grok','perplexity','языков','нейросет','языковая модель']},
@@ -958,17 +1058,33 @@ async function doPublish() {
   const btn=document.getElementById('btn-publish'), res=document.getElementById('publish-result');
   btn.disabled=true; btn.textContent='Publishing...'; res.style.display='none';
   const textToSend=getEditedText()||generatedContent;
+  const checkSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>`;
+  const errSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>`;
   try {
-    const r=await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
-    const data=await r.json();
-    if (!data.ok) throw new Error(data.error||'Error');
+    const results = [];
+    // Telegram
+    if (activePlatform==='telegram'||activePlatform==='both') {
+      const r=await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
+      const d=await r.json();
+      if (!d.ok) throw new Error('Telegram: '+(d.error||'Error'));
+      results.push('Telegram');
+    }
+    // LinkedIn
+    if (activePlatform==='linkedin'||activePlatform==='both') {
+      if (!liConnected) throw new Error('LinkedIn not connected. Click Connect first.');
+      const r=await fetch('/api/publish_linkedin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
+      const d=await r.json();
+      if (!d.ok) throw new Error('LinkedIn: '+(d.error||'Error'));
+      results.push('LinkedIn');
+    }
     res.className='publish-result ok';
-    res.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Published to channel`;
+    res.innerHTML=`${checkSvg} Published to ${results.join(' & ')}`;
     res.style.display='flex'; btn.textContent='Published';
   } catch(e) {
     res.className='publish-result err';
-    res.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg> ${esc(e.message)}`;
-    res.style.display='flex'; btn.disabled=false; btn.textContent='Retry';
+    res.innerHTML=`${errSvg} ${esc(e.message)}`;
+    res.style.display='flex'; btn.disabled=false;
+    btn.textContent = activePlatform==='telegram'?'Publish to Channel':activePlatform==='linkedin'?'Publish to LinkedIn':'Publish to Both';
   }
 }
 
