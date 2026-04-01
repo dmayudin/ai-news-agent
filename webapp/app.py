@@ -63,7 +63,10 @@ LINKEDIN_REDIRECT_URI  = os.getenv('LINKEDIN_REDIRECT_URI', 'https://ai.collieco
 LINKEDIN_TOKENS_FILE   = '/opt/ai-news-agent/data/linkedin_tokens.json'
 
 # Путь к файлу очереди отложенных публикаций (shared-data volume)
-SCHEDULE_FILE = '/opt/ai-news-agent/data/scheduled_posts.json'
+SCHEDULE_FILE  = '/opt/ai-news-agent/data/scheduled_posts.json'
+# Персистентный кэш новостей с переводом
+NEWS_CACHE_FILE = '/opt/ai-news-agent/data/news_cache.json'
+NEWS_CACHE_TTL  = 1800  # 30 минут — после этого фетчим свежие новости автоматически
 
 # ── LinkedIn helpers ───────────────────────────────────────────────────────────
 
@@ -170,17 +173,43 @@ agent = NewsAgent(
     user_id=os.getenv('TELEGRAM_USER_ID', ''),
 )
 
-# ── Cache ──────────────────────────────────────────────────────────────────────
+# ── In-memory кэш сырых новостей (fetch) ────────────────────────────────────
 _cache = {'data': [], 'updated': None}
-CACHE_TTL = 1800
 
 def get_news(force=False):
     now = datetime.now().timestamp()
-    if force or not _cache['data'] or (now - (_cache['updated'] or 0)) > CACHE_TTL:
+    if force or not _cache['data'] or (now - (_cache['updated'] or 0)) > NEWS_CACHE_TTL:
         news = agent.fetch_news(hours_back=24) or agent.fetch_news(hours_back=72) or []
         _cache['data'] = news
         _cache['updated'] = now
     return _cache['data']
+
+# ── Персистентный кэш переведённых новостей ─────────────────────────────────
+
+def _nc_load() -> dict:
+    """Загрузить персистентный кэш из файла."""
+    try:
+        if os.path.exists(NEWS_CACHE_FILE):
+            with open(NEWS_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning('_nc_load error: %s', e)
+    return {'items': [], 'updated': 0}
+
+def _nc_save(data: dict):
+    """Сохранить персистентный кэш в файл."""
+    try:
+        os.makedirs(os.path.dirname(NEWS_CACHE_FILE), exist_ok=True)
+        with open(NEWS_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error('_nc_save error: %s', e)
+
+def _nc_is_fresh() -> bool:
+    """Проверить, свеж ли персистентный кэш."""
+    nc = _nc_load()
+    updated = nc.get('updated', 0)
+    return bool(nc.get('items')) and (datetime.now().timestamp() - updated) < NEWS_CACHE_TTL
 
 # ── Translation ────────────────────────────────────────────────────────────────
 def _is_ru(t):
@@ -299,18 +328,49 @@ def index():
 @app.route('/api/news')
 @login_required
 def api_news():
+    force_refresh = request.args.get('refresh') == '1'
     try:
-        news  = get_news(force=request.args.get('refresh')=='1')
+        # Если не force и кэш свеж — отдаём из файла без LLM-запроса
+        if not force_refresh and _nc_is_fresh():
+            nc = _nc_load()
+            return jsonify({
+                'ok':      True,
+                'count':   len(nc['items']),
+                'updated': nc.get('updated'),
+                'cached':  True,
+                'items':   nc['items'],
+            })
+
+        # Фетчим свежие новости + переводим
+        news  = get_news(force=force_refresh)
         items = news[:50]
         trs   = translate_batch(items)
+        fmt   = [fmt_item(n, trs[i]) for i, n in enumerate(items)]
+
+        # Сохраняем в персистентный кэш
+        now_ts = datetime.now().timestamp()
+        _nc_save({'items': fmt, 'updated': now_ts})
+
         return jsonify({
             'ok':      True,
-            'count':   len(items),
-            'updated': _cache.get('updated'),
-            'items':   [fmt_item(n, trs[i]) for i, n in enumerate(items)],
+            'count':   len(fmt),
+            'updated': now_ts,
+            'cached':  False,
+            'items':   fmt,
         })
     except Exception as e:
         logger.error('api_news: %s', e, exc_info=True)
+        # Если ошибка при обновлении — отдаём старый кэш если есть
+        nc = _nc_load()
+        if nc.get('items'):
+            return jsonify({
+                'ok':      True,
+                'count':   len(nc['items']),
+                'updated': nc.get('updated'),
+                'cached':  True,
+                'stale':   True,
+                'items':   nc['items'],
+            })
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/analyze')
@@ -579,20 +639,39 @@ def linkedin_callback():
             datetime.now(timezone.utc) + timedelta(seconds=expires_in)
         ).isoformat()
 
-        # Get user info (sub = person ID)
-        ui_resp = requests.get('https://api.linkedin.com/v2/userinfo', headers={
-            'Authorization': f'Bearer {token_data["access_token"]}'
-        }, timeout=10)
-        ui = ui_resp.json() if ui_resp.ok else {}
+        # Get user info (sub = person ID) — optional, save token even if this fails
+        try:
+            ui_resp = requests.get('https://api.linkedin.com/v2/userinfo', headers={
+                'Authorization': f'Bearer {token_data["access_token"]}'
+            }, timeout=30)
+            ui = ui_resp.json() if ui_resp.ok else {}
+        except Exception as ui_err:
+            logger.warning('userinfo fetch failed (non-fatal): %s', ui_err)
+            ui = {}
         token_data['sub']   = ui.get('sub', '')
         token_data['name']  = ui.get('name', '')
         token_data['email'] = ui.get('email', '')
 
+        # If sub is still empty, try /v2/me endpoint as fallback
+        if not token_data['sub']:
+            try:
+                me_resp = requests.get('https://api.linkedin.com/v2/me', headers={
+                    'Authorization': f'Bearer {token_data["access_token"]}'
+                }, timeout=30)
+                me = me_resp.json() if me_resp.ok else {}
+                token_data['sub'] = me.get('id', '')
+                if not token_data['name']:
+                    fn = me.get('localizedFirstName', '')
+                    ln = me.get('localizedLastName', '')
+                    token_data['name'] = f'{fn} {ln}'.strip()
+            except Exception as me_err:
+                logger.warning('me fetch failed (non-fatal): %s', me_err)
+
         _li_save_tokens(token_data)
         session.pop('linkedin_state', None)
 
-        name = token_data.get('name', 'Пользователь')
-        logger.info('LinkedIn connected for %s', name)
+        name = token_data.get('name', '') or 'LinkedIn Account'
+        logger.info('LinkedIn connected, sub=%s name=%s', token_data.get('sub','?'), name)
 
         return f'''
 <!DOCTYPE html><html lang="ru">

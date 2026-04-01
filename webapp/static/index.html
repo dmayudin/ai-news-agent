@@ -679,17 +679,19 @@ mark {
     <div id="news-list"></div>
   </div>
 
-  <div id="tab-analysis" style="display:none; position:relative">
+  <div id="tab-generate" style="display:none; position:relative">
     <div class="tab-hero-bg"></div>
     <div class="analysis-section" style="position:relative;z-index:1">
-      <div class="section-label">AI Analysis</div>
-      <button class="primary-btn" id="btn-analyze" onclick="doAnalyze()">Run Analysis</button>
-      <div id="analysis-result" style="display:none">
-        <div class="analysis-box" id="analysis-text"></div>
-        <div class="section-label" style="margin-top:4px">Create Content</div>
-        <button class="secondary-btn" id="btn-post" onclick="doGenerate('post')" disabled>Write Post</button>
-        <button class="secondary-btn" id="btn-digest" onclick="doGenerate('digest')" disabled>Build Digest</button>
+
+      <!-- Кнопки генерации — видны когда контент ещё не сгенерирован -->
+      <div id="gen-buttons" style="">
+        <div class="section-label">Generate content</div>
+        <button class="primary-btn" id="btn-post" onclick="doGenerate('post')">Write Post</button>
+        <button class="secondary-btn" id="btn-digest" onclick="doGenerate('digest')" style="margin-top:8px">Build Digest</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5">Or select articles on the News tab and tap Post / Digest.</p>
       </div>
+
+      <!-- Панель с результатом -->
       <div id="content-panel" style="display:none">
         <div class="action-panel">
           <div class="action-panel-title" id="content-panel-title">Post</div>
@@ -722,6 +724,7 @@ mark {
           <div id="publish-result" style="display:none"></div>
         </div>
       </div>
+
     </div>
   </div>
 </div>
@@ -742,7 +745,7 @@ mark {
     </div>
     News
   </button>
-  <button class="nav-item" id="nav-analysis" onclick="showTab('analysis')">
+  <button class="nav-item" id="nav-generate" onclick="showTab('generate')">
     <div class="nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -839,7 +842,7 @@ function detectCat(item) {
 }
 
 function showTab(name) {
-  ['news','analysis'].forEach(t => {
+  ['news','generate'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===name?'':'none';
     document.getElementById('nav-'+t).classList.toggle('on', t===name);
   });
@@ -968,10 +971,18 @@ async function loadNews(force=false) {
   dot.className='status-dot loading'; stxt.textContent='Loading';
   ['search-row','filters','stats-row','translate-notice'].forEach(id=>document.getElementById(id).style.display='none');
   list.innerHTML=Array(5).fill(0).map(()=>`<div class="skel-card"><div class="skel" style="height:10px;width:45%;margin-bottom:12px"></div><div class="skel" style="height:15px;width:90%;margin-bottom:8px"></div><div class="skel" style="height:11px;width:100%;margin-bottom:5px"></div><div class="skel" style="height:11px;width:70%"></div></div>`).join('');
-  const timer=setTimeout(()=>{dot.className='status-dot working';stxt.textContent='Translating';document.getElementById('translate-notice').style.display='flex';},900);
+  // Показываем спиннер перевода только если force (refresh) — при кэше быстро
+  let timer = null;
+  if (force) {
+    timer = setTimeout(()=>{
+      dot.className='status-dot working'; stxt.textContent='Translating';
+      document.getElementById('translate-notice').style.display='flex';
+    }, 900);
+  }
   try {
     const r=await fetch(force?'/api/news?refresh=1':'/api/news'), data=await r.json();
-    clearTimeout(timer); document.getElementById('translate-notice').style.display='none';
+    if (timer) clearTimeout(timer);
+    document.getElementById('translate-notice').style.display='none';
     if (!data.ok) throw new Error(data.error||'API error');
     allNews=(data.items||[]).map(n=>({...n,_cat:detectCat(n)}));
     selectedIds.clear(); updateCounts(allNews); renderList();
@@ -979,9 +990,11 @@ async function loadNews(force=false) {
     dot.className='status-dot';
     const upd=data.updated?new Date(data.updated*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';
     const ru=allNews.filter(n=>n.translated).length;
-    stxt.textContent=`${allNews.length} articles${upd?' · '+upd:''}${ru?' · '+ru+' RU':''}`;
+    const cached=data.cached?' · cached':'';
+    stxt.textContent=`${allNews.length} articles${upd?' · '+upd:''}${ru?' · '+ru+' RU':''}${cached}`;
   } catch(e) {
-    clearTimeout(timer); document.getElementById('translate-notice').style.display='none';
+    if (timer) clearTimeout(timer);
+    document.getElementById('translate-notice').style.display='none';
     dot.className='status-dot loading'; stxt.textContent='Error';
     list.innerHTML=`<div class="state"><div class="state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg></div><div class="state-title">Failed to load</div><div class="state-sub">${esc(e.message)}</div></div>`;
   }
@@ -990,13 +1003,14 @@ async function loadNews(force=false) {
 async function generateFromSelected(type) {
   if (selectedIds.size===0) return;
   const ids = Array.from(selectedIds);
-  showTab('analysis');
+  showTab('generate');
   const panel=document.getElementById('content-panel'), title=document.getElementById('content-panel-title');
   const text=document.getElementById('content-text'), pubRes=document.getElementById('publish-result');
   panel.style.display='none'; pubRes.style.display='none';
-  document.getElementById('analysis-result').style.display='none';
-  const btn=document.getElementById('btn-analyze');
-  btn.disabled=true; btn.textContent=type==='post'?'Writing post...':'Building digest...';
+  document.getElementById('gen-buttons').style.display='none';
+  // Показываем спиннер в кнопке
+  const btn = document.getElementById(type==='post'?'btn-post':'btn-digest');
+  if (btn) { btn.disabled=true; btn.textContent=type==='post'?'Writing...':'Building...'; }
   try {
     const r=await fetch('/api/generate?type='+type,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selected_ids:ids})});
     const data=await r.json();
@@ -1007,22 +1021,11 @@ async function generateFromSelected(type) {
     panel.style.display='';
     document.getElementById('btn-publish').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
-  } catch(e) { alert('Error: '+e.message); }
-  btn.disabled=false; btn.textContent='Run Analysis';
-}
-
-async function doAnalyze() {
-  const btn=document.getElementById('btn-analyze'), res=document.getElementById('analysis-result'), txt=document.getElementById('analysis-text');
-  btn.disabled=true; btn.textContent='Analyzing...'; res.style.display='none';
-  try {
-    const r=await fetch('/api/analyze'), data=await r.json();
-    if (!data.ok) throw new Error(data.error||'Error');
-    analysisText=data.analysis; txt.textContent=analysisText; res.style.display='';
-    document.getElementById('btn-post').disabled=false;
-    document.getElementById('btn-digest').disabled=false;
-    btn.textContent='Re-run Analysis';
-  } catch(e) { txt.textContent='Error: '+e.message; res.style.display=''; btn.textContent='Retry'; }
-  btn.disabled=false;
+  } catch(e) {
+    document.getElementById('gen-buttons').style.display='';
+    alert('Error: '+e.message);
+  }
+  if (btn) { btn.disabled=false; btn.textContent=type==='post'?'Write Post':'Build Digest'; }
 }
 
 async function doGenerate(type) {
@@ -1037,6 +1040,7 @@ async function doGenerate(type) {
     generatedContent=data.content; generatedType=type;
     title.textContent=type==='post'?'Post':'Digest';
     text.innerHTML=renderContent(generatedContent);
+    document.getElementById('gen-buttons').style.display='none';
     panel.style.display='';
     document.getElementById('btn-publish').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
@@ -1110,6 +1114,7 @@ async function doSchedule() {
 
 function discardContent() {
   document.getElementById('content-panel').style.display='none';
+  document.getElementById('gen-buttons').style.display='';
   generatedContent=''; generatedType='';
 }
 
