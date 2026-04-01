@@ -2,31 +2,34 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Dmitrii Yudin | AI Strategy & Growth</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI News — Вход</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:      #0a0a0c;
-  --bg2:     #111114;
-  --surface: #18181c;
-  --border:  #222228;
-  --border2: #2e2e36;
-  --text:    #f0f0f2;
-  --text2:   #9898a8;
-  --text3:   #5a5a6a;
-  --accent:  #c8a96e;
-  --accent2: #e0c080;
-  --red:     #e05555;
-  --r:       10px;
+  --bg:      #0A0A0A;
+  --bg2:     #111111;
+  --surface: #0A0A0A;
+  --border:  #1E1E1E;
+  --border2: #2A2A2A;
+  --text:    #F0F0F0;
+  --text2:   #888888;
+  --text3:   #555555;
+  --accent:  #E8FF47;
+  --red:     #FF5555;
+  --r:       12px;
 }
 
 html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -34,33 +37,30 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  padding: 24px;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background-image:
+    linear-gradient(rgba(232,255,71,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,255,71,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
 }
 
-/* ── Background pattern ──────────────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(200,169,110,0.06) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 80% 80%, rgba(200,169,110,0.03) 0%, transparent 60%);
-  pointer-events: none;
-  z-index: 0;
-}
+
 
 /* ── Card ────────────────────────────────────────────────────── */
 .card {
-  position: relative;
-  z-index: 1;
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
   background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 40px 32px 36px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 40px 36px 36px;
+  animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Logo ────────────────────────────────────────────────────── */
@@ -71,34 +71,47 @@ body::before {
   margin-bottom: 32px;
 }
 
-.logo-mark {
+.logo-icon {
   width: 36px; height: 36px;
-  border: 1.5px solid var(--accent);
-  border-radius: 8px;
+  background: var(--accent);
+  border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
 
-.logo-text {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.6px; text-transform: uppercase;
+.logo-icon svg { width: 18px; height: 18px; }
+
+.logo-name {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 16px;
   color: var(--text);
-  line-height: 1.4;
+  line-height: 1.2;
 }
-.logo-text span { color: var(--accent); }
+
+.logo-name span {
+  display: block;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text3);
+  letter-spacing: 0.3px;
+  margin-top: 1px;
+}
 
 /* ── Heading ─────────────────────────────────────────────────── */
 .heading {
-  font-size: 22px; font-weight: 700;
-  letter-spacing: -0.3px;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 28px;
   color: var(--text);
-  margin-bottom: 6px;
+  line-height: 1.15;
+  margin-bottom: 8px;
 }
 
 .subheading {
-  font-size: 13px; color: var(--text3);
-  margin-bottom: 28px;
-  letter-spacing: 0.1px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin-bottom: 32px;
 }
 
 /* ── Form ────────────────────────────────────────────────────── */
@@ -108,10 +121,11 @@ body::before {
 
 .field label {
   display: block;
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.8px; text-transform: uppercase;
-  color: var(--text3);
-  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  letter-spacing: 0.3px;
+  margin-bottom: 7px;
 }
 
 .field input {
@@ -120,10 +134,12 @@ body::before {
   border: 1px solid var(--border2);
   border-radius: var(--r);
   color: var(--text);
+  font-family: 'DM Sans', sans-serif;
   font-size: 14px;
+  font-weight: 400;
   padding: 12px 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s;
   -webkit-appearance: none;
 }
 
@@ -131,18 +147,20 @@ body::before {
 
 .field input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(232,255,71,0.08);
 }
 
 /* ── Error ───────────────────────────────────────────────────── */
 .error-msg {
   display: none;
-  font-size: 12px; color: var(--red);
-  background: rgba(224,85,85,0.08);
-  border: 1px solid rgba(224,85,85,0.2);
+  font-size: 12px;
+  color: var(--red);
+  background: rgba(255,85,85,0.07);
+  border: 1px solid rgba(255,85,85,0.18);
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 16px;
-  letter-spacing: 0.1px;
+  line-height: 1.4;
 }
 .error-msg.visible { display: block; }
 
@@ -150,15 +168,17 @@ body::before {
 .submit-btn {
   width: 100%;
   background: var(--accent);
-  color: #000;
+  color: #0A0A0A;
   border: none;
   border-radius: var(--r);
-  font-size: 13px; font-weight: 700;
-  letter-spacing: 0.6px; text-transform: uppercase;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
   padding: 14px;
   margin-top: 8px;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+  transition: opacity 0.15s, transform 0.1s;
   position: relative;
   overflow: hidden;
 }
@@ -203,19 +223,19 @@ body::before {
 <div class="card">
   <!-- Logo -->
   <div class="logo">
-    <div class="logo-mark">
-      <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14">
-        <rect x="1" y="1" width="5" height="5" rx="1" fill="#c8a96e"/>
-        <rect x="8" y="1" width="5" height="5" rx="1" fill="#c8a96e" opacity="0.5"/>
-        <rect x="1" y="8" width="5" height="5" rx="1" fill="#c8a96e" opacity="0.5"/>
-        <rect x="8" y="8" width="5" height="5" rx="1" fill="#c8a96e" opacity="0.3"/>
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M11 2L4 10h6l-1 6 9-10h-6l2-4z" fill="#0A0A0A" stroke="#0A0A0A" stroke-width="0.5" stroke-linejoin="round"/>
       </svg>
     </div>
-    <div class="logo-text">Dmitrii Yudin | AI <span>Strategy & Growth</span></div>
+    <div class="logo-name">
+      AI News
+      <span>Dmitrii Yudin · AI Strategy</span>
+    </div>
   </div>
 
   <!-- Heading -->
-  <div class="heading">Вход</div>
+  <div class="heading">Добро пожаловать</div>
   <div class="subheading">Доступ только для авторизованных пользователей</div>
 
   <!-- Error -->
@@ -255,7 +275,7 @@ body::before {
   </form>
 
   <div class="divider"></div>
-  <div class="footer">AI Strategy & Growth — Private Access</div>
+  <div class="footer">Private Access · AI Strategy &amp; Growth</div>
 </div>
 
 <script>
