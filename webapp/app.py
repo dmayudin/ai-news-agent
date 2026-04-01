@@ -8,13 +8,16 @@ Endpoints:
   GET  /logout              — выход
   GET  /api/news            — новости с переводом
   GET  /api/analyze         — GPT-анализ
-  GET  /api/generate?type=post|digest  — генерация поста или дайджеста
+  GET|POST /api/generate?type=post|digest  — генерация поста или дайджеста
+                                             POST body: {selected_ids: [int, ...]}
   POST /api/publish         — публикация в Telegram канал
+  POST /api/schedule        — отложенная публикация {text, time: "HH:MM"}
   GET  /health              — статус (без авторизации)
 """
 import os, sys, json, logging, requests, hashlib, secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
+from zoneinfo import ZoneInfo
 
 from flask import (Flask, jsonify, send_from_directory, request,
                    redirect, url_for, session, make_response)
@@ -34,7 +37,6 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 # ── Auth config ────────────────────────────────────────────────────────────────
 APP_USERNAME = os.getenv('APP_USERNAME', 'dmayudin')
 APP_PASSWORD = os.getenv('APP_PASSWORD', 'BulochkaSobachka2026!')
-# Секретный ключ для подписи сессий — генерируется один раз при старте
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 
 def _hash(pw: str) -> str:
@@ -44,7 +46,6 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('authenticated'):
-            # API-запросы получают 401, браузерные — редирект на /login
             if request.path.startswith('/api/'):
                 return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
             return redirect(url_for('login_page', next=request.path))
@@ -53,6 +54,9 @@ def login_required(f):
 
 BOT_TOKEN  = os.getenv('TELEGRAM_BOT_TOKEN', '')
 CHANNEL_ID = os.getenv('CHANNEL_ID', '@ai_is_you')
+
+# Путь к файлу очереди отложенных публикаций (shared-data volume)
+SCHEDULE_FILE = '/opt/ai-news-agent/data/scheduled_posts.json'
 
 @app.after_request
 def cors(r):
@@ -136,6 +140,24 @@ def fmt_item(item, tr):
         'translated':   t_ru != t_orig,
     }
 
+# ── Schedule queue helpers ─────────────────────────────────────────────────────
+def _load_schedule():
+    try:
+        if os.path.exists(SCHEDULE_FILE):
+            with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning('_load_schedule error: %s', e)
+    return []
+
+def _save_schedule(tasks):
+    try:
+        os.makedirs(os.path.dirname(SCHEDULE_FILE), exist_ok=True)
+        with open(SCHEDULE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(tasks, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error('_save_schedule error: %s', e)
+
 # ── Auth routes ────────────────────────────────────────────────────────────────
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -204,7 +226,7 @@ def api_analyze():
         logger.error('api_analyze: %s', e, exc_info=True)
         return jsonify({'ok': False, 'error': str(e)}), 500
 
-@app.route('/api/generate')
+@app.route('/api/generate', methods=['GET', 'POST'])
 @login_required
 def api_generate():
     gen_type = request.args.get('type', 'post')
@@ -213,12 +235,29 @@ def api_generate():
         if not news:
             return jsonify({'ok': False, 'error': 'No news'}), 404
 
-        # Для поста — топ-15, для дайджеста — все доступные новости (макс 30)
-        n_items = 15 if gen_type == 'post' else min(len(news), 30)
-        items = news[:n_items]
-        trs   = translate_batch(items)
-        formatted_items = [fmt_item(n, trs[i]) for i, n in enumerate(items)]
+        # Если POST с selected_ids — берём только выбранные новости
+        selected_ids = None
+        if request.method == 'POST':
+            body = request.get_json(force=True) or {}
+            selected_ids = body.get('selected_ids')
 
+        if selected_ids is not None and len(selected_ids) > 0:
+            # Фильтруем по индексам из allNews (клиент передаёт индексы в массиве news)
+            # Переводим весь список, потом выбираем нужные
+            all_items = news[:50]
+            all_trs   = translate_batch(all_items)
+            all_fmt   = [fmt_item(all_items[i], all_trs[i]) for i in range(len(all_items))]
+            # selected_ids — индексы в отображаемом списке (до 50)
+            valid_ids = [i for i in selected_ids if 0 <= i < len(all_fmt)]
+            formatted_items = [all_fmt[i] for i in valid_ids]
+            logger.info('api_generate: using %d selected items (ids: %s)', len(formatted_items), valid_ids[:10])
+        else:
+            # Стандартный режим — все новости
+            items = news[:30]
+            trs   = translate_batch(items)
+            formatted_items = [fmt_item(items[i], trs[i]) for i in range(len(items))]
+
+        # Формируем блок новостей для промпта
         news_lines = []
         for idx, it in enumerate(formatted_items):
             if not it['title']:
@@ -227,11 +266,21 @@ def api_generate():
             source = it.get('source', '')
             news_lines.append(
                 f"[{idx}] {it['title']}\n"
-                f"    Описание: {it['summary'][:200]}\n"
+                f"    Описание: {it['summary'][:180]}\n"
                 f"    Источник: {source}\n"
                 f"    Ссылка: {link}"
             )
         news_block = '\n\n'.join(news_lines)
+
+        # Текущая дата по МСК
+        MONTHS_RU = ['января','февраля','марта','апреля','мая','июня',
+                     'июля','августа','сентября','октября','ноября','декабря']
+        try:
+            msk = ZoneInfo('Europe/Moscow')
+            now_msk = datetime.now(msk)
+        except Exception:
+            now_msk = datetime.now()
+        today_str = f"{now_msk.day} {MONTHS_RU[now_msk.month-1]} {now_msk.year}"
 
         if gen_type == 'post':
             prompt = (
@@ -239,70 +288,57 @@ def api_generate():
                 'Напиши один яркий пост на русском языке на основе самой интересной новости из списка ниже.\n'
                 'Стиль: экспертный, живой, без воды. Длина: 150–250 слов.\n'
                 'Без хэштегов. Без эмодзи.\n'
-                'В конце поста добавь одну строку: <a href="ССЫЛКА">→ источник</a>\n'
-                'Используй HTML-тег <a href="..."> для ссылки.\n\n'
+                'ВАЖНО: используй ТОЛЬКО теги <b>текст</b> для жирного и <a href="URL">текст</a> для ссылок.\n'
+                'НЕ используй **звёздочки**, *курсив*, markdown-разметку.\n'
+                'В конце поста добавь одну строку: <a href="ССЫЛКА">→ источник</a>\n\n'
                 'Новости:\n' + news_block
             )
         else:
-            # Дата сегодня по МСК — передаётся в промпт, чтобы GPT вставил её в заголовок
-            import locale
-            today_str = datetime.now().strftime('%-d %B %Y')
-            # Переводим месяц вручную (локаль не всегда доступна в Docker)
-            _months = {
-                'January':'января','February':'февраля','March':'марта',
-                'April':'апреля','May':'мая','June':'июня',
-                'July':'июля','August':'августа','September':'сентября',
-                'October':'октября','November':'ноября','December':'декабря',
-            }
-            for en, ru_m in _months.items():
-                today_str = today_str.replace(en, ru_m)
+            n_items = len(formatted_items)
+            n_points = min(max(n_items, 3), 12)
             prompt = (
-                'Ты — редактор Telegram-канала @ai_is_you об искусственном интеллекте.\n'
-                f'Составь дайджест AI-новостей за {today_str} на русском языке из новостей ниже.\n'
-                '\n'
-                'Требуемый формат (копируй точно, без отступов):\n'
-                '\n'
+                f'Ты — редактор Telegram-канала @ai_is_you об искусственном интеллекте.\n'
+                f'Составь дайджест AI-новостей за {today_str} на русском языке.\n'
+                f'\n'
+                f'ВАЖНО: используй ТОЛЬКО теги <b>текст</b> для жирного и <a href="URL">текст</a> для ссылок.\n'
+                f'НЕ используй **звёздочки**, *курсив*, markdown-разметку, хэштеги, эмодзи.\n'
+                f'\n'
+                f'Формат дайджеста (строго соблюдай):\n'
+                f'\n'
                 f'<b>Дайджест AI-новостей — {today_str}</b>\n'
-                '\n'
-                '<b>ЗАГОЛОВОК ПЕРВОЙ НОВОСТИ</b>\n'
-                '1–2 предложения: что произошло, почему важно.\n'
-                '<a href="URL_ПЕРВОЙ_НОВОСТИ">→ источник</a>\n'
-                '\n'
-                '<b>ЗАГОЛОВОК ВТОРОЙ НОВОСТИ</b>\n'
-                '1–2 предложения: что произошло, почему важно.\n'
-                '<a href="URL_ВТОРОЙ_НОВОСТИ">→ источник</a>\n'
-                '\n'
-                f'... и так далее для каждой из 10–12 новостей (всего доступно {n_items}).\n'
-                '\n'
-                'Правила:\n'
-                '1. Заголовок каждого пункта — суть новости, не название источника.\n'
-                '   Плохо: «TechCrunch: OpenAI выпустила модель».\n'
-                '   Хорошо: «OpenAI выпустила GPT-5 с поддержкой видео».\n'
-                '2. Описание: 1–2 предложения, конкретно, без воды.\n'
-                '3. Ссылка сразу после описания: <a href="реальный_URL">→ источник</a>\n'
-                '4. Между пунктами обязательно пустая строка.\n'
-                '5. Без хэштегов, без эмодзи, без маркдаун звёздочек (**), без тире.\n'
-                '6. Только HTML-теги <b> и <a href="..."> — больше никаких HTML-тегов.\n'
-                '\n'
-                'Новости:\n' + news_block
+                f'\n'
+                f'<b>КРАТКИЙ ЗАГОЛОВОК ПО СУТИ ПЕРВОЙ НОВОСТИ</b>\n'
+                f'1–2 предложения с подробным описанием: что произошло, почему важно.\n'
+                f'<a href="ССЫЛКА">→ источник</a>\n'
+                f'\n'
+                f'<b>КРАТКИЙ ЗАГОЛОВОК ПО СУТИ ВТОРОЙ НОВОСТИ</b>\n'
+                f'1–2 предложения с подробным описанием.\n'
+                f'<a href="ССЫЛКА">→ источник</a>\n'
+                f'\n'
+                f'... и так далее, {n_points} пунктов.\n'
+                f'\n'
+                f'Требования к заголовкам:\n'
+                f'  - Заголовок = суть новости, а НЕ название источника.\n'
+                f'  - Плохо: «TechCrunch: OpenAI выпустила модель».\n'
+                f'  - Хорошо: «OpenAI выпустила GPT-5 с поддержкой видео».\n'
+                f'\n'
+                f'Новости:\n' + news_block
             )
 
-        max_tok = 800 if gen_type == 'post' else 3000
+        max_tok = 3000 if gen_type == 'digest' else 800
         content = chat_complete(
             [{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=max_tok,
         )
-        # Постобработка: чистим артефакты, которые GPT может добавить вопреки инструкциям
+
+        # Постобработка: убираем markdown-артефакты которые GPT может добавить вопреки инструкции
         import re
-        # Убираем markdown-звёздочки **text** → text (не работают в Telegram HTML-режиме)
-        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
-        # Убираем одиночные звёздочки *text*
-        content = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'\1', content)
-        # Убираем недопустимые HTML-теги (оставляем только <b>, </b>, <a href=...>, </a>)
-        content = re.sub(r'<(?!/?b>|/?a[ >]|a href)[^>]+>', '', content)
-        # Нормализуем пустые строки: не больше 2 подряд пустых строк
-        content = re.sub(r'\n{3,}', '\n\n', content).strip()
+        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)   # **жирный** → жирный
+        content = re.sub(r'\*(.+?)\*',     r'\1', content)   # *курсив* → текст
+        content = re.sub(r'#{1,6}\s*',     '',    content)   # ## заголовки
+        content = re.sub(r'\n{3,}',        '\n\n', content)  # тройные переносы
+
         return jsonify({'ok': True, 'content': content, 'type': gen_type})
     except Exception as e:
         logger.error('api_generate: %s', e, exc_info=True)
@@ -321,9 +357,10 @@ def api_publish():
 
         url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
         resp = requests.post(url, json={
-            'chat_id':    CHANNEL_ID,
-            'text':       text,
-            'parse_mode': 'HTML',
+            'chat_id':                  CHANNEL_ID,
+            'text':                     text,
+            'parse_mode':               'HTML',
+            'disable_web_page_preview': True,
         }, timeout=15)
         data = resp.json()
         if not data.get('ok'):
@@ -335,14 +372,63 @@ def api_publish():
         logger.error('api_publish: %s', e, exc_info=True)
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.route('/api/schedule', methods=['POST'])
+@login_required
+def api_schedule():
+    """Добавить пост в очередь отложенной публикации."""
+    try:
+        body = request.get_json(force=True)
+        text = (body.get('text') or '').strip()
+        time_str = (body.get('time') or '').strip()  # "HH:MM"
+
+        if not text:
+            return jsonify({'ok': False, 'error': 'Empty text'}), 400
+        if not time_str or len(time_str) != 5 or ':' not in time_str:
+            return jsonify({'ok': False, 'error': 'Invalid time format, expected HH:MM'}), 400
+
+        # Вычисляем дату публикации по МСК
+        try:
+            msk = ZoneInfo('Europe/Moscow')
+            now_msk = datetime.now(msk)
+        except Exception:
+            now_msk = datetime.now()
+
+        hour, minute = int(time_str.split(':')[0]), int(time_str.split(':')[1])
+        publish_dt = now_msk.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        # Если время уже прошло — ставим на завтра
+        if publish_dt <= now_msk:
+            from datetime import timedelta
+            publish_dt += timedelta(days=1)
+
+        task = {
+            'id':         secrets.token_hex(8),
+            'text':       text,
+            'channel_id': CHANNEL_ID,
+            'publish_at': publish_dt.isoformat(),
+            'created_at': now_msk.isoformat(),
+            'status':     'pending',
+        }
+
+        tasks = _load_schedule()
+        tasks.append(task)
+        _save_schedule(tasks)
+
+        logger.info('Scheduled post %s for %s', task['id'], task['publish_at'])
+        return jsonify({'ok': True, 'task_id': task['id'], 'publish_at': task['publish_at']})
+    except Exception as e:
+        logger.error('api_schedule: %s', e, exc_info=True)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.route('/health')
 def health():
     """Публичный health-check — без авторизации."""
+    scheduled = len([t for t in _load_schedule() if t.get('status') == 'pending'])
     return jsonify({
-        'ok':      True,
-        'service': 'ai-news-webapp',
-        'cached':  len(_cache.get('data') or []),
-        'updated': _cache.get('updated'),
+        'ok':       True,
+        'service':  'ai-news-webapp',
+        'cached':   len(_cache.get('data') or []),
+        'updated':  _cache.get('updated'),
+        'scheduled': scheduled,
     })
 
 if __name__ == '__main__':
