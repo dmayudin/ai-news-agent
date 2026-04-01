@@ -213,7 +213,9 @@ def api_generate():
         if not news:
             return jsonify({'ok': False, 'error': 'No news'}), 404
 
-        items = news[:15]
+        # Для поста — топ-15, для дайджеста — все доступные новости (макс 30)
+        n_items = 15 if gen_type == 'post' else min(len(news), 30)
+        items = news[:n_items]
         trs   = translate_batch(items)
         formatted_items = [fmt_item(n, trs[i]) for i, n in enumerate(items)]
 
@@ -225,7 +227,7 @@ def api_generate():
             source = it.get('source', '')
             news_lines.append(
                 f"[{idx}] {it['title']}\n"
-                f"    Описание: {it['summary'][:180]}\n"
+                f"    Описание: {it['summary'][:200]}\n"
                 f"    Источник: {source}\n"
                 f"    Ссылка: {link}"
             )
@@ -270,7 +272,7 @@ def api_generate():
                 '1–2 предложения: что произошло, почему важно.\n'
                 '<a href="URL_ВТОРОЙ_НОВОСТИ">→ источник</a>\n'
                 '\n'
-                '... и так далее для каждой из 5–7 новостей.\n'
+                f'... и так далее для каждой из 10–12 новостей (всего доступно {n_items}).\n'
                 '\n'
                 'Правила:\n'
                 '1. Заголовок каждого пункта — суть новости, не название источника.\n'
@@ -285,11 +287,22 @@ def api_generate():
                 'Новости:\n' + news_block
             )
 
+        max_tok = 800 if gen_type == 'post' else 3000
         content = chat_complete(
             [{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=1200,
+            max_tokens=max_tok,
         )
+        # Постобработка: чистим артефакты, которые GPT может добавить вопреки инструкциям
+        import re
+        # Убираем markdown-звёздочки **text** → text (не работают в Telegram HTML-режиме)
+        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)
+        # Убираем одиночные звёздочки *text*
+        content = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'\1', content)
+        # Убираем недопустимые HTML-теги (оставляем только <b>, </b>, <a href=...>, </a>)
+        content = re.sub(r'<(?!/?b>|/?a[ >]|a href)[^>]+>', '', content)
+        # Нормализуем пустые строки: не больше 2 подряд пустых строк
+        content = re.sub(r'\n{3,}', '\n\n', content).strip()
         return jsonify({'ok': True, 'content': content, 'type': gen_type})
     except Exception as e:
         logger.error('api_generate: %s', e, exc_info=True)
