@@ -1,189 +1,208 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Dmitrii Yudin | AI Strategy &amp; Growth</title>
+<title>YDA · AI News</title>
 <!-- PWA -->
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0A0A0A">
+<meta name="theme-color" content="#0D0D0D">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="AI News">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
-<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png?v=2">
-<link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120.png?v=2">
-<!-- /PWA -->
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-title" content="YDA News">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=3">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png?v=3">
+<link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120.png?v=3">
+<!-- Geist font from Vercel CDN -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
+/* ── DESIGN TOKENS ── */
 :root {
-  --bg:        #0A0A0A;
-  --surface:   #141414;
-  --surface2:  #1A1A1A;
-  --border:    #262626;
-  --border2:   #333333;
-  --text:      #FAFAFA;
-  --muted:     #737373;
-  --muted2:    #525252;
-  --accent:    #E8FF47;
-  --accent-2:  #FF6B35;
-  --green:     #4ADE80;
+  --bg:        #0D0D0D;
+  --surface:   #161616;
+  --surface2:  #1C1C1C;
+  --surface3:  #222222;
+  --border:    #282828;
+  --border2:   #383838;
+  --text:      #F2F2F2;
+  --text2:     #C0C0C0;
+  --muted:     #6E6E6E;
+  --muted2:    #4A4A4A;
+  --accent:    #29BA74;
+  --accent-dim: rgba(41,186,116,0.12);
+  --accent-glow: rgba(41,186,116,0.06);
   --red:       #F87171;
   --blue:      #60A5FA;
-  --r:         12px;
-  --r-sm:      8px;
-  --r-xs:      6px;
-  --font-serif:'Instrument Serif', Georgia, serif;
-  --font-sans: 'DM Sans', -apple-system, system-ui, sans-serif;
+  --orange:    #FB923C;
+  --r:         14px;
+  --r-sm:      10px;
+  --r-xs:      7px;
+  --font:      'Geist', -apple-system, 'SF Pro Display', system-ui, sans-serif;
+  --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
-*,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
-html { height:100%; background:var(--bg); scroll-behavior:smooth }
+
+/* ── RESET ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+html { height: 100%; background: var(--bg); -webkit-text-size-adjust: 100% }
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  padding-bottom: 72px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
-a { color:inherit; text-decoration:none }
-button { font-family:var(--font-sans); cursor:pointer }
+a { color: inherit; text-decoration: none }
+button { font-family: var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent }
+input { font-family: var(--font) }
 
 /* ── HEADER ── */
 .header {
   position: sticky; top: 0; z-index: 200;
-  background: rgba(10,10,10,0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(13,13,13,0.88);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--border);
-  padding: 14px 16px 0;
+  padding: 12px 16px 0;
 }
 .header-row {
   display: flex; align-items: center;
-  justify-content: space-between; margin-bottom: 14px;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
-.brand { display:flex; align-items:center; gap:10px }
-.brand-mark {
-  width: 30px; height: 30px;
+
+/* YDA Logo */
+.brand { display: flex; align-items: center; gap: 10px }
+.brand-logo {
+  width: 32px; height: 32px;
+  border-radius: 50%;
   background: var(--accent);
-  border-radius: 7px;
-  display: flex; align-items:center; justify-content:center;
+  display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(41,186,116,0);
+  transition: box-shadow 0.3s;
 }
-.brand-mark svg { width:15px; height:15px }
+.brand-logo:active { box-shadow: 0 0 0 4px rgba(41,186,116,0.15) }
+.brand-logo-text {
+  font-family: var(--font);
+  font-size: 11px; font-weight: 700;
+  color: #fff; letter-spacing: 0.05em;
+  line-height: 1;
+}
 .brand-name {
-  font-family: var(--font-sans);
-  font-size: 13px; font-weight: 600;
-  letter-spacing: -0.2px; color: var(--text);
-  white-space: nowrap;
+  font-size: 14px; font-weight: 600;
+  letter-spacing: -0.3px; color: var(--text);
 }
 .brand-name span { color: var(--muted); font-weight: 400 }
 
 .header-status {
-  display: flex; align-items:center; gap:6px;
+  display: flex; align-items: center; gap: 6px;
   font-size: 11px; color: var(--muted);
-  font-family: var(--font-sans);
 }
 .status-dot {
   width: 6px; height: 6px; border-radius: 50%;
-  background: var(--green); flex-shrink: 0;
+  background: var(--accent); flex-shrink: 0;
+  transition: background 0.3s;
 }
-.status-dot.loading  { background: var(--muted2); animation: blink 1.4s infinite }
-.status-dot.working  { background: var(--accent); animation: blink 1.4s infinite }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.status-dot.loading { background: var(--muted2); animation: pulse 1.4s infinite }
+.status-dot.working { background: var(--accent); animation: pulse 0.8s infinite }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
 
 /* ── SEARCH ── */
-.search-row { position:relative; margin-bottom:10px }
+.search-row { position: relative; margin-bottom: 10px }
 .search-input {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 14px; font-weight: 400;
   padding: 10px 36px 10px 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition);
   -webkit-appearance: none;
+  appearance: none;
 }
 .search-input::placeholder { color: var(--muted2) }
 .search-input:focus { border-color: var(--accent) }
 .search-clear {
-  position: absolute; right:11px; top:50%;
+  position: absolute; right: 11px; top: 50%;
   transform: translateY(-50%);
   background: none; border: none;
   color: var(--muted); font-size: 14px;
-  display: none; line-height:1; padding:3px;
+  display: none; line-height: 1; padding: 4px;
 }
-.search-clear.show { display:block }
+.search-clear.show { display: block }
 
 /* ── FILTERS ── */
 .filters {
-  display: flex; gap:6px;
+  display: flex; gap: 6px;
   overflow-x: auto; scrollbar-width: none;
   padding-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
 }
-.filters::-webkit-scrollbar { display:none }
+.filters::-webkit-scrollbar { display: none }
 .chip {
   flex-shrink: 0;
   background: none;
   border: 1px solid var(--border);
   border-radius: 100px;
   color: var(--muted);
-  font-family: var(--font-sans);
   font-size: 12px; font-weight: 500;
   padding: 5px 13px;
   transition: all 0.15s;
   white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
 }
-.chip:active { transform: scale(0.96) }
+.chip:active { transform: scale(0.95) }
 .chip.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #000; font-weight: 600;
+  color: #fff; font-weight: 600;
 }
-.chip-n {
-  display: inline-block;
-  font-size: 10px; opacity: 0.6;
-  margin-left: 2px;
-}
+.chip-n { font-size: 10px; opacity: 0.6; margin-left: 2px }
 
-/* ── CONTENT ── */
+/* ── MAIN CONTENT ── */
 .content { padding: 12px 14px 0 }
 
 .stats-row {
-  display: flex; align-items:center;
+  display: flex; align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
   font-size: 12px; color: var(--muted);
 }
-.stats-row strong { color: var(--text); font-weight: 500 }
+.stats-row strong { color: var(--text2); font-weight: 500 }
 .refresh-btn {
   background: none; border: none;
   color: var(--muted); font-size: 12px;
-  font-family: var(--font-sans);
   padding: 0; transition: color 0.15s;
+  display: flex; align-items: center; gap: 4px;
 }
+.refresh-btn svg { width: 12px; height: 12px }
 .refresh-btn:active { color: var(--accent) }
 
 .notice {
-  display: flex; align-items:center; gap:9px;
-  border: 1px solid rgba(232,255,71,0.15);
+  display: flex; align-items: center; gap: 9px;
+  border: 1px solid rgba(41,186,116,0.18);
   border-radius: var(--r-sm);
   padding: 10px 13px; margin-bottom: 10px;
   font-size: 12px; color: var(--accent);
+  background: rgba(41,186,116,0.04);
 }
-.notice .spin-xs {
-  width:12px; height:12px; flex-shrink:0;
-  border: 1.5px solid rgba(232,255,71,0.25);
+.spin-xs {
+  width: 12px; height: 12px; flex-shrink: 0;
+  border: 1.5px solid rgba(41,186,116,0.25);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg) } }
 
 /* ── SKELETON ── */
 .skel-card {
@@ -195,13 +214,13 @@ button { font-family:var(--font-sans); cursor:pointer }
 .skel {
   background: linear-gradient(90deg,
     rgba(255,255,255,0.03) 25%,
-    rgba(255,255,255,0.07) 50%,
+    rgba(255,255,255,0.06) 50%,
     rgba(255,255,255,0.03) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite;
   border-radius: 4px;
 }
-@keyframes shimmer { to { background-position:-200% 0 } }
+@keyframes shimmer { to { background-position: -200% 0 } }
 
 /* ── CARD ── */
 .card {
@@ -211,79 +230,66 @@ button { font-family:var(--font-sans); cursor:pointer }
   padding: 15px 15px 13px;
   margin-bottom: 8px;
   position: relative; overflow: hidden;
-  animation: fadeUp 0.3s ease both;
-  transition: border-color 0.2s, background 0.2s;
+  animation: fadeUp 0.28s ease both;
+  transition: border-color var(--transition), background var(--transition);
+  -webkit-tap-highlight-color: transparent;
 }
-.card:hover { border-color: var(--border2) }
 .card::before {
   content: '';
-  position: absolute; top:0; left:0;
+  position: absolute; top: 0; left: 0;
   width: 3px; height: 100%;
   background: var(--card-line, var(--accent));
-  opacity: 0.5;
+  opacity: 0.4;
   border-radius: 3px 0 0 3px;
 }
 .card.selected {
   border-color: var(--accent);
-  background: rgba(232,255,71,0.04);
+  background: var(--accent-glow);
 }
 .card.selected::before { opacity: 1 }
-
 @keyframes fadeUp {
-  from { opacity:0; transform:translateY(10px) }
-  to   { opacity:1; transform:translateY(0) }
+  from { opacity: 0; transform: translateY(8px) }
+  to   { opacity: 1; transform: translateY(0) }
 }
 
 .card-meta {
-  display: flex; align-items:center;
+  display: flex; align-items: center;
   justify-content: space-between;
-  margin-bottom: 9px; gap:8px;
+  margin-bottom: 9px; gap: 8px;
 }
 .card-meta-left {
-  display:flex; align-items:center;
-  gap:8px; flex:1; min-width:0;
+  display: flex; align-items: center;
+  gap: 8px; flex: 1; min-width: 0;
 }
 .card-tags {
-  display:flex; align-items:center;
-  gap:5px; flex:1; min-width:0;
+  display: flex; align-items: center;
+  gap: 5px; flex: 1; min-width: 0;
 }
 .tag {
   font-size: 10px; font-weight: 600;
   letter-spacing: 0.3px;
   padding: 2px 8px; border-radius: 100px;
-  white-space: nowrap; overflow:hidden; text-overflow:ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.tag-src {
-  background: rgba(255,255,255,0.06);
-  color: var(--muted); max-width:100px;
-}
-.tag-cat {
-  background: var(--cat-bg, rgba(232,255,71,0.1));
-  color: var(--cat-c, var(--accent));
-}
-.tag-ru {
-  background: rgba(74,222,128,0.1);
-  color: var(--green);
-}
-.card-date {
-  font-size: 11px; color: var(--muted2); flex-shrink:0;
-}
+.tag-src { background: rgba(255,255,255,0.05); color: var(--muted); max-width: 100px }
+.tag-cat { background: var(--cat-bg, var(--accent-dim)); color: var(--cat-c, var(--accent)) }
+.tag-ru  { background: rgba(41,186,116,0.1); color: var(--accent) }
+.card-date { font-size: 11px; color: var(--muted2); flex-shrink: 0 }
 
 .card-check {
-  width: 20px; height: 20px; flex-shrink:0;
+  width: 20px; height: 20px; flex-shrink: 0;
   border: 1.5px solid var(--border2);
   border-radius: 5px; background: none;
-  display:flex; align-items:center; justify-content:center;
-  transition: all 0.15s; cursor:pointer; padding:0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; cursor: pointer; padding: 0;
 }
 .card-check.checked {
   background: var(--accent); border-color: var(--accent);
 }
-.card-check svg { width:11px; height:11px; display:none }
-.card-check.checked svg { display:block }
+.card-check svg { width: 11px; height: 11px; display: none }
+.card-check.checked svg { display: block }
 
 .card-title {
-  font-family: var(--font-sans);
   font-size: 14px; font-weight: 500;
   line-height: 1.5; color: var(--text);
   margin-bottom: 6px; letter-spacing: -0.1px;
@@ -297,20 +303,19 @@ button { font-family:var(--font-sans); cursor:pointer }
   overflow: hidden;
 }
 .card-footer {
-  display:flex; align-items:center;
+  display: flex; align-items: center;
   justify-content: space-between;
 }
 .card-link {
   font-size: 12px; color: var(--accent);
   font-weight: 500; transition: opacity 0.15s;
-  display: flex; align-items:center; gap:4px;
+  display: flex; align-items: center; gap: 4px;
 }
 .card-link:active { opacity: 0.6 }
-.card-link svg { width:12px; height:12px }
+.card-link svg { width: 12px; height: 12px }
 .card-orig-btn {
   background: none; border: none;
   font-size: 11px; color: var(--muted2);
-  font-family: var(--font-sans);
   padding: 0; transition: color 0.15s;
 }
 .card-orig-btn:active { color: var(--accent) }
@@ -321,7 +326,7 @@ button { font-family:var(--font-sans); cursor:pointer }
   border-radius: var(--r-sm);
   border-left: 2px solid var(--border2);
 }
-.orig-block.show { display:block }
+.orig-block.show { display: block }
 .orig-label {
   font-size: 10px; font-weight: 600;
   color: var(--muted2); letter-spacing: 0.5px;
@@ -329,60 +334,82 @@ button { font-family:var(--font-sans); cursor:pointer }
 }
 .orig-text { font-size: 12px; color: var(--muted); line-height: 1.55 }
 
-/* category color tokens */
-.c-llm      { --cat-bg:rgba(96,165,250,0.1);  --cat-c:var(--blue);   --card-line:var(--blue) }
-.c-robots   { --cat-bg:rgba(232,255,71,0.1);   --cat-c:var(--accent); --card-line:var(--accent) }
-.c-product  { --cat-bg:rgba(74,222,128,0.1);   --cat-c:var(--green);  --card-line:var(--green) }
-.c-research { --cat-bg:rgba(96,165,250,0.1);   --cat-c:#93C5FD;       --card-line:var(--blue) }
-.c-business { --cat-bg:rgba(255,107,53,0.1);   --cat-c:var(--accent-2); --card-line:var(--accent-2) }
-.c-safety   { --cat-bg:rgba(248,113,113,0.1);  --cat-c:var(--red);    --card-line:var(--red) }
-.c-other    { --cat-bg:rgba(255,255,255,0.05); --cat-c:var(--muted);  --card-line:var(--muted2) }
+/* Category color tokens */
+.c-llm      { --cat-bg:rgba(96,165,250,0.1);   --cat-c:#60A5FA; --card-line:#60A5FA }
+.c-robots   { --cat-bg:rgba(41,186,116,0.1);    --cat-c:var(--accent); --card-line:var(--accent) }
+.c-product  { --cat-bg:rgba(41,186,116,0.08);   --cat-c:var(--accent); --card-line:var(--accent) }
+.c-research { --cat-bg:rgba(96,165,250,0.1);    --cat-c:#93C5FD; --card-line:#93C5FD }
+.c-business { --cat-bg:rgba(251,146,60,0.1);    --cat-c:var(--orange); --card-line:var(--orange) }
+.c-safety   { --cat-bg:rgba(248,113,113,0.1);   --cat-c:var(--red); --card-line:var(--red) }
+.c-other    { --cat-bg:rgba(255,255,255,0.04);  --cat-c:var(--muted); --card-line:var(--muted2) }
 
-/* ── STATES ── */
+/* ── EMPTY / ERROR STATES ── */
 .state {
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  padding: 56px 24px; text-align:center; gap:8px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px 24px; text-align: center; gap: 8px;
 }
 .state-icon {
-  width:48px; height:48px;
+  width: 48px; height: 48px;
   border: 1px solid var(--border2);
   border-radius: 50%;
-  display:flex; align-items:center; justify-content:center;
+  display: flex; align-items: center; justify-content: center;
   margin-bottom: 4px;
 }
-.state-icon svg { width:20px; height:20px; color:var(--muted) }
-.state-title { font-size:15px; font-weight:500; color:var(--text) }
-.state-sub   { font-size:13px; color:var(--muted) }
+.state-icon svg { width: 20px; height: 20px; color: var(--muted) }
+.state-title { font-size: 15px; font-weight: 500; color: var(--text) }
+.state-sub   { font-size: 13px; color: var(--muted) }
 
-.spinner {
-  width:24px; height:24px;
-  border: 2px solid var(--border2);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
+/* ── TAB TRANSITIONS ── */
+.tab-panel {
+  animation: tabIn 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-@keyframes spin { to { transform:rotate(360deg) } }
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(12px) }
+  to   { opacity: 1; transform: translateY(0) }
+}
 
-/* ── ANALYSIS TAB ── */
-.analysis-section { padding: 4px 0 }
-.section-label {
+/* ── GENERATE TAB ── */
+.gen-hero {
+  position: relative;
+  padding: 28px 0 20px;
+  margin-bottom: 4px;
+}
+.gen-hero-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(41,186,116,0.08) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 0%, rgba(41,186,116,0.04) 0%, transparent 50%);
+  pointer-events: none;
+}
+.gen-hero-label {
   font-size: 11px; font-weight: 600;
-  letter-spacing: 0.5px; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 12px;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px;
+  position: relative;
+}
+.gen-hero-title {
+  font-size: 22px; font-weight: 600;
+  letter-spacing: -0.5px; color: var(--text);
+  line-height: 1.25; position: relative;
+}
+.gen-hero-sub {
+  font-size: 13px; color: var(--muted);
+  margin-top: 6px; line-height: 1.55;
+  position: relative;
 }
 
-/* Buttons */
+/* ── BUTTONS ── */
 .primary-btn {
   width: 100%;
-  background: var(--accent); color: #000;
+  background: var(--accent); color: #fff;
   border: none; border-radius: var(--r-sm);
-  font-family: var(--font-sans);
   font-size: 14px; font-weight: 600;
   padding: 14px; transition: opacity 0.2s, transform 0.1s;
   margin-bottom: 8px; letter-spacing: -0.1px;
+  -webkit-tap-highlight-color: transparent;
 }
-.primary-btn:disabled { opacity: 0.4; cursor: default }
+.primary-btn:disabled { opacity: 0.35; cursor: default }
 .primary-btn:active:not(:disabled) { opacity: 0.85; transform: scale(0.99) }
 
 .secondary-btn {
@@ -391,10 +418,10 @@ button { font-family:var(--font-sans); cursor:pointer }
   border: 1px solid var(--border2);
   border-radius: var(--r-sm);
   color: var(--text);
-  font-family: var(--font-sans);
   font-size: 14px; font-weight: 500;
-  padding: 13px; transition: all 0.2s;
+  padding: 13px; transition: all 0.18s;
   margin-bottom: 8px;
+  -webkit-tap-highlight-color: transparent;
 }
 .secondary-btn:disabled { opacity: 0.35; cursor: default }
 .secondary-btn:active:not(:disabled) {
@@ -404,27 +431,17 @@ button { font-family:var(--font-sans); cursor:pointer }
 .danger-btn {
   width: 100%;
   background: none;
-  border: 1px solid rgba(248,113,113,0.25);
+  border: 1px solid rgba(248,113,113,0.2);
   border-radius: var(--r-sm);
   color: var(--red);
-  font-family: var(--font-sans);
   font-size: 14px; font-weight: 500;
-  padding: 13px; transition: all 0.2s;
+  padding: 13px; transition: all 0.18s;
   margin-bottom: 8px;
+  -webkit-tap-highlight-color: transparent;
 }
 .danger-btn:active {
   border-color: var(--red);
   background: rgba(248,113,113,0.06);
-}
-
-.analysis-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 16px;
-  font-size: 13px; line-height: 1.8;
-  color: var(--muted); white-space: pre-wrap;
-  margin-bottom: 14px;
 }
 
 /* ── ACTION PANEL ── */
@@ -432,23 +449,40 @@ button { font-family:var(--font-sans); cursor:pointer }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 16px; margin-bottom: 12px;
+  padding: 18px; margin-bottom: 12px;
+}
+.action-panel-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 .action-panel-title {
-  font-family: var(--font-serif);
-  font-size: 20px; font-weight: 400;
-  color: var(--text); margin-bottom: 4px;
-  letter-spacing: -0.3px;
+  font-size: 18px; font-weight: 600;
+  color: var(--text); letter-spacing: -0.4px;
+}
+.action-panel-badge {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 3px 8px; border-radius: 100px;
 }
 .action-panel-sub {
   font-size: 12px; color: var(--muted);
   margin-bottom: 14px;
 }
+.edit-hint {
+  font-size: 11px; color: var(--muted2);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 5px;
+}
+.edit-hint svg { width: 11px; height: 11px; flex-shrink: 0 }
 
 .action-content {
   font-size: 14px; line-height: 1.75;
   color: var(--text); margin-bottom: 14px;
   max-height: 340px; overflow-y: auto; outline: none;
+  -webkit-overflow-scrolling: touch;
 }
 .action-content[contenteditable="true"] {
   border: 1px solid var(--border2);
@@ -457,190 +491,246 @@ button { font-family:var(--font-sans); cursor:pointer }
   background: rgba(255,255,255,0.02);
   transition: border-color 0.2s;
 }
-.action-content[contenteditable="true"]:focus {
+.action-content[contenteditable="true"]:focus { border-color: var(--accent) }
+.action-content a { color: var(--accent); text-decoration: none; font-weight: 500 }
+.action-content::-webkit-scrollbar { width: 3px }
+.action-content::-webkit-scrollbar-track { background: transparent }
+.action-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px }
+
+.divider { height: 1px; background: var(--border); margin: 16px 0 }
+
+/* ── PLATFORM SELECTOR ── */
+.platform-tabs { display: flex; gap: 6px; margin-bottom: 12px }
+.platform-tab {
+  flex: 1; padding: 9px 4px; border-radius: var(--r-sm);
+  border: 1px solid var(--border2); background: var(--surface);
+  color: var(--muted); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.18s; text-align: center;
+  letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent;
+}
+.platform-tab.active {
   border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
 }
-.action-content a { color: var(--accent); text-decoration:none; font-weight:500 }
-.action-content::-webkit-scrollbar { width:3px }
-.action-content::-webkit-scrollbar-track { background:transparent }
-.action-content::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px }
 
-.edit-hint {
-  font-size: 11px; color: var(--muted2);
-  margin-bottom: 10px;
-  display:flex; align-items:center; gap:5px;
+.li-status {
+  font-size: 11px; color: var(--muted2); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
 }
-.edit-hint svg { width:11px; height:11px; flex-shrink:0 }
+.li-status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--muted2); flex-shrink: 0;
+}
+.li-status-dot.on { background: var(--accent) }
+.li-connect-btn {
+  font-size: 11px; color: var(--accent);
+  text-decoration: underline;
+  background: none; border: none; cursor: pointer; padding: 0;
+}
 
-.divider { height:1px; background:var(--border); margin:14px 0 }
-
+/* ── SCHEDULE ROW ── */
 .schedule-row {
-  display:flex; gap:8px;
-  align-items:stretch; margin-bottom:8px;
+  display: flex; gap: 8px;
+  align-items: stretch; margin-bottom: 8px;
 }
-.schedule-row .secondary-btn { flex:1; margin-bottom:0 }
+.schedule-row .secondary-btn { flex: 1; margin-bottom: 0 }
 .time-input {
   background: var(--surface);
   border: 1px solid var(--border2);
   border-radius: var(--r-sm);
   color: var(--text);
-  font-family: var(--font-sans);
   font-size: 14px; font-weight: 500;
   padding: 0 12px; outline: none;
-  width: 92px; text-align:center;
+  width: 92px; text-align: center;
   -webkit-appearance: none;
+  appearance: none;
   transition: border-color 0.2s;
 }
 .time-input:focus { border-color: var(--accent) }
-.time-input::-webkit-calendar-picker-indicator { filter:invert(0.4) }
+.time-input::-webkit-calendar-picker-indicator { filter: invert(0.4) }
 
+/* ── PUBLISH RESULT ── */
 .publish-result {
-  display:flex; align-items:center; gap:10px;
+  display: flex; align-items: center; gap: 10px;
   padding: 12px 14px; border-radius: var(--r-sm);
   font-size: 13px; font-weight: 500;
 }
-.publish-result.ok  { background:rgba(74,222,128,0.08);  color:var(--green); border:1px solid rgba(74,222,128,0.2) }
-.publish-result.err { background:rgba(248,113,113,0.08); color:var(--red);   border:1px solid rgba(248,113,113,0.2) }
-.publish-result.sch { background:rgba(96,165,250,0.08);  color:var(--blue);  border:1px solid rgba(96,165,250,0.2) }
-.publish-result svg { width:16px; height:16px; flex-shrink:0 }
-
-/* ── PLATFORM SELECTOR ── */
-.platform-tabs {
-  display:flex; gap:6px; margin-bottom:12px;
-}
-.platform-tab {
-  flex:1; padding:8px 4px; border-radius:var(--r-sm);
-  border:1px solid var(--border2); background:var(--surface);
-  color:var(--muted); font-size:12px; font-weight:600;
-  cursor:pointer; transition:all 0.18s; text-align:center;
-  letter-spacing:0.02em; font-family:var(--font-sans);
-}
-.platform-tab.active {
-  border-color:var(--accent); background:rgba(232,255,71,0.08);
-  color:var(--accent);
-}
-.li-status {
-  font-size:11px; color:var(--muted2); margin-bottom:10px;
-  display:flex; align-items:center; gap:6px;
-}
-.li-status-dot {
-  width:6px; height:6px; border-radius:50%;
-  background:var(--muted2); flex-shrink:0;
-}
-.li-status-dot.on { background:#4ade80 }
-.li-connect-btn {
-  font-size:11px; color:var(--accent); text-decoration:underline;
-  background:none; border:none; cursor:pointer; padding:0;
-  font-family:var(--font-sans);
-}
+.publish-result.ok  { background: rgba(41,186,116,0.08); color: var(--accent); border: 1px solid rgba(41,186,116,0.2) }
+.publish-result.err { background: rgba(248,113,113,0.08); color: var(--red);   border: 1px solid rgba(248,113,113,0.2) }
+.publish-result.sch { background: rgba(96,165,250,0.08);  color: var(--blue);  border: 1px solid rgba(96,165,250,0.2) }
+.publish-result svg { width: 16px; height: 16px; flex-shrink: 0 }
 
 /* ── SELECTION BAR ── */
 .sel-bar {
-  position: fixed; bottom: 80px;
+  position: fixed; bottom: calc(72px + env(safe-area-inset-bottom) + 8px);
   left: 14px; right: 14px;
   background: var(--surface2);
   border: 1px solid var(--accent);
   border-radius: var(--r);
   padding: 12px 14px;
-  display: flex; align-items:center; gap:10px;
+  display: flex; align-items: center; gap: 10px;
   z-index: 300;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,255,71,0.08);
-  transform: translateY(16px); opacity:0;
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(41,186,116,0.06);
+  transform: translateY(20px); opacity: 0;
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.28s;
   pointer-events: none;
 }
-.sel-bar.show { transform:translateY(0); opacity:1; pointer-events:auto }
-.sel-bar-count {
-  font-size: 13px; font-weight: 600;
-  color: var(--accent); flex:1;
-}
+.sel-bar.show { transform: translateY(0); opacity: 1; pointer-events: auto }
+.sel-bar-count { font-size: 13px; font-weight: 600; color: var(--accent); flex: 1 }
 .sel-bar-btn {
-  background: var(--accent); color: #000;
+  background: var(--accent); color: #fff;
   border: none; border-radius: var(--r-xs);
-  font-family: var(--font-sans);
   font-size: 12px; font-weight: 600;
   padding: 8px 14px; transition: opacity 0.15s;
   white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
 }
 .sel-bar-btn:active { opacity: 0.8 }
 .sel-bar-clear {
   background: none; border: none;
   color: var(--muted); font-size: 12px;
-  font-family: var(--font-sans);
   padding: 0; transition: color 0.15s;
 }
 .sel-bar-clear:active { color: var(--text) }
 
 /* ── BOTTOM NAV ── */
 .bottom-nav {
-  position: fixed; bottom:0; left:0; right:0;
-  background: rgba(10,10,10,0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(13,13,13,0.94);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
   border-top: 1px solid var(--border);
   display: flex;
-  padding: 0 0 max(8px, env(safe-area-inset-bottom));
+  padding: 0 0 env(safe-area-inset-bottom);
   z-index: 200;
 }
 .nav-item {
   flex: 1;
-  display: flex; flex-direction:column;
-  align-items:center; gap:3px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
   background: none; border: none;
   color: var(--muted);
-  font-family: var(--font-sans);
   font-size: 10px; font-weight: 500;
   letter-spacing: 0.2px;
-  padding: 10px 0 6px;
-  transition: color 0.15s;
+  padding: 10px 0 8px;
+  transition: color var(--transition);
   position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 .nav-item.on { color: var(--text) }
 .nav-item::after {
   content: '';
-  position: absolute; top:0; left:50%;
+  position: absolute; top: 0; left: 50%;
   transform: translateX(-50%);
-  width: 24px; height: 2px;
+  width: 28px; height: 2px;
   background: var(--accent);
   border-radius: 0 0 2px 2px;
-  opacity: 0; transition: opacity 0.15s;
+  opacity: 0;
+  transition: opacity var(--transition);
 }
 .nav-item.on::after { opacity: 1 }
 .nav-icon {
   width: 22px; height: 22px;
-  display: flex; align-items:center; justify-content:center;
+  display: flex; align-items: center; justify-content: center;
 }
-.nav-icon svg { width:18px; height:18px }
+.nav-icon svg { width: 18px; height: 18px }
 
+/* ── HIGHLIGHT ── */
 mark {
-  background: rgba(232,255,71,0.2);
-  color: var(--text); border-radius:2px; padding:0 1px;
+  background: rgba(41,186,116,0.18);
+  color: var(--text); border-radius: 2px; padding: 0 1px;
 }
 
-/* ── HERO GRADIENT (analysis tab bg) ── */
-.tab-hero-bg {
-  position: absolute; top:0; left:0; right:0; height:200px;
-  background:
-    radial-gradient(ellipse at 20% 0%, rgba(232,255,71,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 0%, rgba(255,107,53,0.04) 0%, transparent 50%);
-  pointer-events: none; z-index:0;
+/* ── SECTION LABEL ── */
+.section-label {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 12px;
 }
+
+/* ── GEN BUTTONS GRID ── */
+.gen-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 16px;
+}
+.gen-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 16px;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+.gen-card:active { border-color: var(--accent); background: var(--accent-glow) }
+.gen-card:disabled { opacity: 0.4; cursor: default }
+.gen-card-icon {
+  width: 32px; height: 32px;
+  background: var(--accent-dim);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+}
+.gen-card-icon svg { width: 16px; height: 16px; color: var(--accent) }
+.gen-card-title {
+  font-size: 14px; font-weight: 600;
+  color: var(--text); margin-bottom: 4px;
+  letter-spacing: -0.2px;
+}
+.gen-card-sub {
+  font-size: 11px; color: var(--muted);
+  line-height: 1.4;
+}
+
+/* ── HINT BOX ── */
+.hint-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 12px;
+}
+.hint-box-icon {
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--accent-dim);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+}
+.hint-box-icon svg { width: 14px; height: 14px; color: var(--accent) }
+.hint-box-text { font-size: 12px; color: var(--muted); line-height: 1.55 }
+.hint-box-text strong { color: var(--text2); font-weight: 500 }
+
+/* ── SAFARI FIXES ── */
+@supports (-webkit-touch-callout: none) {
+  .bottom-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)) }
+  body { padding-bottom: calc(72px + max(8px, env(safe-area-inset-bottom))) }
+}
+/* Prevent double-tap zoom on buttons */
+button { touch-action: manipulation }
+/* Fix time input on Safari */
+input[type="time"] { min-height: 44px }
+/* Smooth scrolling on iOS */
+.filters, .action-content { -webkit-overflow-scrolling: touch }
 
 /* ── RESPONSIVE ── */
-@media (hover: none) {
-  .card:hover { border-color: var(--border) }
+@media (hover: none) { .card:hover { border-color: var(--border) } }
+@media (min-width: 480px) {
+  .content { padding: 16px 20px 0 }
+  .header  { padding: 14px 20px 0 }
 }
 </style>
 </head>
 <body>
 
+<!-- HEADER -->
 <div class="header">
   <div class="header-row">
     <div class="brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M7.5 1L9.5 5.5H14L10.5 8.5L12 13L7.5 10L3 13L4.5 8.5L1 5.5H5.5L7.5 1Z" fill="#000" stroke="#000" stroke-width="0.5" stroke-linejoin="round"/>
-        </svg>
+      <div class="brand-logo">
+        <span class="brand-logo-text">YDA</span>
       </div>
       <div class="brand-name">AI News <span>/ Dmitrii Yudin</span></div>
     </div>
@@ -666,11 +756,22 @@ mark {
   </div>
 </div>
 
+<!-- MAIN CONTENT -->
 <div class="content" id="main-content">
-  <div id="tab-news">
+
+  <!-- NEWS TAB -->
+  <div id="tab-news" class="tab-panel">
     <div class="stats-row" id="stats-row" style="display:none">
       <span><strong id="stats-shown">0</strong> of <strong id="stats-total">0</strong> articles</span>
-      <button class="refresh-btn" onclick="loadNews(true)">Refresh</button>
+      <button class="refresh-btn" onclick="loadNews(true)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+          <path d="M21 3v5h-5"/>
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+          <path d="M8 16H3v5"/>
+        </svg>
+        Refresh
+      </button>
     </div>
     <div id="translate-notice" class="notice" style="display:none">
       <div class="spin-xs"></div>
@@ -679,32 +780,64 @@ mark {
     <div id="news-list"></div>
   </div>
 
-  <div id="tab-generate" style="display:none; position:relative">
-    <div class="tab-hero-bg"></div>
-    <div class="analysis-section" style="position:relative;z-index:1">
-
-      <!-- Кнопки генерации — видны когда контент ещё не сгенерирован -->
-      <div id="gen-buttons" style="">
-        <div class="section-label">Generate content</div>
-        <button class="primary-btn" id="btn-post" onclick="doGenerate('post')">Write Post</button>
-        <button class="secondary-btn" id="btn-digest" onclick="doGenerate('digest')" style="margin-top:8px">Build Digest</button>
-        <p style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5">Or select articles on the News tab and tap Post / Digest.</p>
+  <!-- GENERATE TAB -->
+  <div id="tab-generate" style="display:none">
+    <div class="tab-panel">
+      <div class="gen-hero">
+        <div class="gen-hero-bg"></div>
+        <div class="gen-hero-label">Content Studio</div>
+        <div class="gen-hero-title">Create &amp; Publish</div>
+        <div class="gen-hero-sub">Generate posts and digests from the latest AI news.</div>
       </div>
 
-      <!-- Панель с результатом -->
+      <!-- Generate buttons (shown when no content yet) -->
+      <div id="gen-buttons">
+        <div class="section-label">Choose format</div>
+        <div class="gen-grid">
+          <button class="gen-card" id="btn-post" onclick="doGenerate('post')">
+            <div class="gen-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </div>
+            <div class="gen-card-title">Post</div>
+            <div class="gen-card-sub">Short punchy post for social media</div>
+          </button>
+          <button class="gen-card" id="btn-digest" onclick="doGenerate('digest')">
+            <div class="gen-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 6h16M4 10h16M4 14h10M4 18h7"/>
+              </svg>
+            </div>
+            <div class="gen-card-title">Digest</div>
+            <div class="gen-card-sub">Full weekly AI news digest</div>
+          </button>
+        </div>
+
+        <div class="hint-box">
+          <div class="hint-box-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v4m0 4h.01"/>
+            </svg>
+          </div>
+          <div class="hint-box-text">
+            <strong>Tip:</strong> Go to the News tab, select specific articles, then tap <strong>Post</strong> or <strong>Digest</strong> in the bottom bar for targeted content.
+          </div>
+        </div>
+      </div>
+
+      <!-- Content panel (shown after generation) -->
       <div id="content-panel" style="display:none">
         <div class="action-panel">
-          <div class="action-panel-title" id="content-panel-title">Post</div>
-          <div class="action-panel-sub">Edit before publishing</div>
-          <div class="edit-hint">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            Tap to edit
+          <div class="action-panel-header">
+            <div class="action-panel-title" id="content-panel-title">Post</div>
+            <div class="action-panel-badge" id="content-panel-badge">Draft</div>
           </div>
+          <div class="action-panel-sub">Tap the text to edit before publishing</div>
           <div class="action-content" id="content-text" contenteditable="true" oninput="onContentEdit()"></div>
           <div class="divider"></div>
+          <div class="section-label">Publish to</div>
           <div class="platform-tabs">
             <button class="platform-tab active" id="tab-tg" onclick="setPlatform('telegram')">Telegram</button>
             <button class="platform-tab" id="tab-li" onclick="setPlatform('linkedin')">LinkedIn</button>
@@ -727,8 +860,10 @@ mark {
 
     </div>
   </div>
+
 </div>
 
+<!-- SELECTION BAR -->
 <div class="sel-bar" id="sel-bar">
   <span class="sel-bar-count" id="sel-count">0 selected</span>
   <button class="sel-bar-btn" onclick="generateFromSelected('post')">Post</button>
@@ -736,6 +871,7 @@ mark {
   <button class="sel-bar-clear" onclick="clearSelection()">Clear</button>
 </div>
 
+<!-- BOTTOM NAV -->
 <div class="bottom-nav">
   <button class="nav-item on" id="nav-news" onclick="showTab('news')">
     <div class="nav-icon">
@@ -748,9 +884,7 @@ mark {
   <button class="nav-item" id="nav-generate" onclick="showTab('generate')">
     <div class="nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-        <path d="M2 17l10 5 10-5"/>
-        <path d="M2 12l10 5 10-5"/>
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
       </svg>
     </div>
     Generate
@@ -762,12 +896,12 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
 let allNews = [], activeFilter = 'all', searchQuery = '';
-let analysisText = '', generatedContent = '', generatedType = '';
+let generatedContent = '', generatedType = '';
 let selectedIds = new Set();
 let activePlatform = 'telegram';
 let liConnected = false;
 
-// ── LinkedIn platform logic ──
+// ── LinkedIn ──
 async function checkLinkedInStatus() {
   try {
     const r = await fetch('/api/linkedin/status');
@@ -787,12 +921,11 @@ async function checkLinkedInStatus() {
       btn.textContent = 'Connect';
       btn.onclick = connectLinkedIn;
     }
-  } catch(e) { console.warn('LinkedIn status check failed:', e); }
+  } catch(e) { console.warn('LinkedIn status:', e); }
 }
 
 function connectLinkedIn() {
   window.open('/linkedin/auth', '_blank', 'width=600,height=700');
-  // Poll for connection after popup
   const poll = setInterval(async () => {
     const r = await fetch('/api/linkedin/status').catch(()=>null);
     if (!r) return;
@@ -811,20 +944,19 @@ async function disconnectLinkedIn() {
 
 function setPlatform(p) {
   activePlatform = p;
-  ['telegram','linkedin','both'].forEach(id => {
-    const tab = document.getElementById('tab-'+id.replace('telegram','tg').replace('linkedin','li').replace('both','both'));
-    if (tab) tab.classList.toggle('active', id===p);
-  });
+  document.getElementById('tab-tg').classList.toggle('active', p==='telegram');
+  document.getElementById('tab-li').classList.toggle('active', p==='linkedin');
+  document.getElementById('tab-both').classList.toggle('active', p==='both');
   const liRow = document.getElementById('li-status-row');
   liRow.style.display = (p==='linkedin'||p==='both') ? 'flex' : 'none';
   if (p==='linkedin'||p==='both') checkLinkedInStatus();
-  // Update publish button label
   const btn = document.getElementById('btn-publish');
   if (p==='telegram') btn.textContent='Publish to Channel';
   else if (p==='linkedin') btn.textContent='Publish to LinkedIn';
   else btn.textContent='Publish to Both';
 }
 
+// ── Categories ──
 const CATS = [
   {id:'llm',kw:['gpt','llm','claude','gemini','mistral','llama','qwen','deepseek','language model','transformer','chatgpt','openai','anthropic','o1','o3','o4','grok','perplexity','языков','нейросет','языковая модель']},
   {id:'robots',kw:['robot','humanoid','boston dynamics','figure','optimus','physical ai','робот','гуманоид','дрон','drone','embodied']},
@@ -841,10 +973,20 @@ function detectCat(item) {
   return 'other';
 }
 
+// ── Tab switching with animation ──
 function showTab(name) {
   ['news','generate'].forEach(t => {
-    document.getElementById('tab-'+t).style.display = t===name?'':'none';
-    document.getElementById('nav-'+t).classList.toggle('on', t===name);
+    const panel = document.getElementById('tab-'+t);
+    const nav   = document.getElementById('nav-'+t);
+    if (t === name) {
+      panel.style.display = '';
+      // Re-trigger animation
+      const inner = panel.querySelector('.tab-panel');
+      if (inner) { inner.style.animation='none'; inner.offsetHeight; inner.style.animation='' }
+    } else {
+      panel.style.display = 'none';
+    }
+    nav.classList.toggle('on', t===name);
   });
   const isNews = name==='news';
   document.getElementById('search-row').style.display  = (isNews&&allNews.length)?'':'none';
@@ -852,6 +994,7 @@ function showTab(name) {
   document.getElementById('stats-row').style.display   = (isNews&&allNews.length)?'':'none';
 }
 
+// ── Filters ──
 function setFilter(cat, btn) {
   activeFilter = cat;
   document.querySelectorAll('.chip').forEach(b=>b.classList.remove('on'));
@@ -865,6 +1008,7 @@ function updateCounts(news) {
   Object.entries(c).forEach(([k,v])=>{const el=document.getElementById('cnt-'+k);if(el)el.textContent=v;});
 }
 
+// ── Search ──
 function onSearch(q) {
   searchQuery = q.trim().toLowerCase();
   document.getElementById('search-clear').classList.toggle('show', q.length>0);
@@ -876,6 +1020,7 @@ function hl(text, q) {
   return esc(text).replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<mark>${m}</mark>`);
 }
 
+// ── Selection ──
 function toggleSelect(globalIdx) {
   if (selectedIds.has(globalIdx)) selectedIds.delete(globalIdx);
   else selectedIds.add(globalIdx);
@@ -900,6 +1045,7 @@ function clearSelection() {
   updateSelBar();
 }
 
+// ── Render news list ──
 function renderList() {
   let items = allNews;
   if (activeFilter!=='all') items=items.filter(n=>n._cat===activeFilter);
@@ -919,7 +1065,7 @@ function renderList() {
   const q = searchQuery;
   list.innerHTML = items.map(item=>{
     const gi = allNews.indexOf(item);
-    const cat = item._cat, delay = Math.min(gi*0.025,0.35).toFixed(2);
+    const cat = item._cat, delay = Math.min(gi*0.022,0.3).toFixed(2);
     const date = fmtDate(item.published);
     const hasOrig = item.translated&&item.title_orig&&item.title_orig!==item.title;
     const cid = 'c'+gi, isSel = selectedIds.has(gi);
@@ -927,7 +1073,7 @@ function renderList() {
   <div class="card-meta">
     <div class="card-meta-left">
       <button class="card-check${isSel?' checked':''}" onclick="toggleSelect(${gi})" title="Select">
-        <svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,6 4.5,9 10.5,3"/></svg>
+        <svg viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,6 4.5,9 10.5,3"/></svg>
       </button>
       <div class="card-tags">
         <span class="tag tag-src">${esc(item.source||'')}</span>
@@ -966,12 +1112,12 @@ function fmtDate(raw) {
   } catch { return raw; }
 }
 
+// ── Load news ──
 async function loadNews(force=false) {
   const dot=document.getElementById('status-dot'), stxt=document.getElementById('status-text'), list=document.getElementById('news-list');
   dot.className='status-dot loading'; stxt.textContent='Loading';
   ['search-row','filters','stats-row','translate-notice'].forEach(id=>document.getElementById(id).style.display='none');
   list.innerHTML=Array(5).fill(0).map(()=>`<div class="skel-card"><div class="skel" style="height:10px;width:45%;margin-bottom:12px"></div><div class="skel" style="height:15px;width:90%;margin-bottom:8px"></div><div class="skel" style="height:11px;width:100%;margin-bottom:5px"></div><div class="skel" style="height:11px;width:70%"></div></div>`).join('');
-  // Показываем спиннер перевода только если force (refresh) — при кэше быстро
   let timer = null;
   if (force) {
     timer = setTimeout(()=>{
@@ -1000,23 +1146,26 @@ async function loadNews(force=false) {
   }
 }
 
+// ── Generate from selected (News tab → sel bar) ──
 async function generateFromSelected(type) {
   if (selectedIds.size===0) return;
   const ids = Array.from(selectedIds);
   showTab('generate');
+  document.getElementById('gen-buttons').style.display='none';
+  document.getElementById('content-panel').style.display='none';
+  const btn = document.getElementById(type==='post'?'btn-post':'btn-digest');
+  if (btn) { btn.disabled=true; }
+  // Show loading state in generate tab
   const panel=document.getElementById('content-panel'), title=document.getElementById('content-panel-title');
   const text=document.getElementById('content-text'), pubRes=document.getElementById('publish-result');
-  panel.style.display='none'; pubRes.style.display='none';
-  document.getElementById('gen-buttons').style.display='none';
-  // Показываем спиннер в кнопке
-  const btn = document.getElementById(type==='post'?'btn-post':'btn-digest');
-  if (btn) { btn.disabled=true; btn.textContent=type==='post'?'Writing...':'Building...'; }
+  pubRes.style.display='none';
   try {
     const r=await fetch('/api/generate?type='+type,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selected_ids:ids})});
     const data=await r.json();
     if (!data.ok) throw new Error(data.error||'Error');
     generatedContent=data.content; generatedType=type;
     title.textContent=type==='post'?'Post':'Digest';
+    document.getElementById('content-panel-badge').textContent='Draft';
     text.innerHTML=renderContent(generatedContent);
     panel.style.display='';
     document.getElementById('btn-publish').disabled=false;
@@ -1025,27 +1174,33 @@ async function generateFromSelected(type) {
     document.getElementById('gen-buttons').style.display='';
     alert('Error: '+e.message);
   }
-  if (btn) { btn.disabled=false; btn.textContent=type==='post'?'Write Post':'Build Digest'; }
+  if (btn) { btn.disabled=false; }
 }
 
+// ── Generate (Generate tab buttons) ──
 async function doGenerate(type) {
   const btn=document.getElementById(type==='post'?'btn-post':'btn-digest');
   const panel=document.getElementById('content-panel'), title=document.getElementById('content-panel-title');
   const text=document.getElementById('content-text'), pubRes=document.getElementById('publish-result');
-  btn.disabled=true; btn.textContent=type==='post'?'Writing...':'Building...';
+  btn.disabled=true;
+  // Show loading text in button
+  const origTitle = btn.querySelector('.gen-card-title');
+  if (origTitle) origTitle.textContent = type==='post'?'Writing...':'Building...';
   panel.style.display='none'; pubRes.style.display='none';
   try {
     const r=await fetch('/api/generate?type='+type), data=await r.json();
     if (!data.ok) throw new Error(data.error||'Error');
     generatedContent=data.content; generatedType=type;
     title.textContent=type==='post'?'Post':'Digest';
+    document.getElementById('content-panel-badge').textContent='Draft';
     text.innerHTML=renderContent(generatedContent);
     document.getElementById('gen-buttons').style.display='none';
     panel.style.display='';
     document.getElementById('btn-publish').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
   } catch(e) { alert('Error: '+e.message); }
-  btn.disabled=false; btn.textContent=type==='post'?'Write Post':'Build Digest';
+  btn.disabled=false;
+  if (origTitle) origTitle.textContent = type==='post'?'Post':'Digest';
 }
 
 function onContentEdit() { generatedContent=getEditedText(); }
@@ -1058,6 +1213,7 @@ function getEditedText() {
   return html.trim();
 }
 
+// ── Publish ──
 async function doPublish() {
   const btn=document.getElementById('btn-publish'), res=document.getElementById('publish-result');
   btn.disabled=true; btn.textContent='Publishing...'; res.style.display='none';
@@ -1066,14 +1222,12 @@ async function doPublish() {
   const errSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>`;
   try {
     const results = [];
-    // Telegram
     if (activePlatform==='telegram'||activePlatform==='both') {
       const r=await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
       const d=await r.json();
       if (!d.ok) throw new Error('Telegram: '+(d.error||'Error'));
       results.push('Telegram');
     }
-    // LinkedIn
     if (activePlatform==='linkedin'||activePlatform==='both') {
       if (!liConnected) throw new Error('LinkedIn not connected. Click Connect first.');
       const r=await fetch('/api/publish_linkedin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
@@ -1083,7 +1237,9 @@ async function doPublish() {
     }
     res.className='publish-result ok';
     res.innerHTML=`${checkSvg} Published to ${results.join(' & ')}`;
-    res.style.display='flex'; btn.textContent='Published';
+    res.style.display='flex';
+    btn.textContent='Published';
+    document.getElementById('content-panel-badge').textContent='Published';
   } catch(e) {
     res.className='publish-result err';
     res.innerHTML=`${errSvg} ${esc(e.message)}`;
@@ -1092,6 +1248,7 @@ async function doPublish() {
   }
 }
 
+// ── Schedule ──
 async function doSchedule() {
   const btn=document.getElementById('btn-schedule'), res=document.getElementById('publish-result');
   const time=document.getElementById('schedule-time').value;
@@ -1139,7 +1296,7 @@ function renderContent(raw) {
 
 loadNews();
 
-// PWA: регистрация Service Worker
+// PWA Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')

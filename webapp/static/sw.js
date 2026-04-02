@@ -1,56 +1,59 @@
-// Service Worker for AI News PWA
-// Стратегия: кэшируем статику (shell), API-запросы всегда идут в сеть
-
-const CACHE_NAME = 'ai-news-v2';
+const CACHE_NAME = 'yda-news-v4';
 const SHELL_ASSETS = [
   '/',
-  '/icons/icon-192.png?v=2',
-  '/icons/icon-512.png?v=2',
+  '/icons/icon-192.png?v=3',
+  '/icons/icon-512.png?v=3',
   '/manifest.json'
 ];
 
-// Установка: кэшируем shell
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(SHELL_ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
   );
 });
 
-// Активация: удаляем старые кэши (включая ai-news-v1)
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      )
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-// Fetch: API всегда в сеть, статика из кэша с fallback в сеть
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
-  // API-запросы, логин/логаут — всегда в сеть, никогда не кэшируем
+  // Network-only for API, login, logout, linkedin
   if (url.pathname.startsWith('/api/') ||
       url.pathname === '/login' ||
-      url.pathname === '/logout') {
+      url.pathname === '/logout' ||
+      url.pathname.startsWith('/linkedin')) {
     event.respondWith(fetch(event.request));
     return;
   }
-
-  // Статика: cache-first, fallback в сеть
+  // Network-first for HTML pages (always fresh UI)
+  if (event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+  // Cache-first for static assets
   event.respondWith(
     caches.match(event.request).then(cached => {
-      return cached || fetch(event.request).then(response => {
-        // Кэшируем только успешные GET-ответы на статику
-        if (event.request.method === 'GET' && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      if (cached) return cached;
+      return fetch(event.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         }
-        return response;
+        return res;
       });
     })
   );

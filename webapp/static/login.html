@@ -2,327 +2,251 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AI News — Вход</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>YDA · Sign In</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
-  --bg:      #0A0A0A;
-  --bg2:     #111111;
-  --surface: #0A0A0A;
-  --border:  #1E1E1E;
-  --border2: #2A2A2A;
-  --text:    #F0F0F0;
-  --text2:   #888888;
-  --text3:   #555555;
-  --accent:  #E8FF47;
-  --red:     #FF5555;
+  --bg:      #0D0D0D;
+  --surface: #161616;
+  --border:  #282828;
+  --border2: #383838;
+  --text:    #F2F2F2;
+  --text2:   #C0C0C0;
+  --muted:   #6E6E6E;
+  --muted2:  #4A4A4A;
+  --accent:  #29BA74;
+  --accent-dim: rgba(41,186,116,0.12);
+  --red:     #F87171;
   --r:       12px;
+  --r-sm:    10px;
+  --font:    'Geist', -apple-system, 'SF Pro Display', system-ui, sans-serif;
 }
-
-html, body {
-  height: 100%;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+html { height: 100%; background: var(--bg) }
+body {
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  min-height: 100%;
+  display: flex; align-items: center; justify-content: center;
   -webkit-font-smoothing: antialiased;
+  padding: 24px 20px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
 
-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  padding: 24px 16px;
+/* Background grid */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
   background-image:
-    linear-gradient(rgba(232,255,71,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232,255,71,0.025) 1px, transparent 1px);
+    linear-gradient(rgba(41,186,116,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(41,186,116,0.03) 1px, transparent 1px);
   background-size: 48px 48px;
+  pointer-events: none;
 }
 
+/* Glow */
+body::after {
+  content: '';
+  position: fixed;
+  top: -20%; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, rgba(41,186,116,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
 
-
-/* ── Card ────────────────────────────────────────────────────── */
 .card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: 20px;
-  padding: 40px 36px 36px;
-  animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  width: 100%; max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 36px 32px;
+  position: relative; z-index: 1;
+  animation: fadeUp 0.4s cubic-bezier(0.4,0,0.2,1) both;
 }
-
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(16px) }
+  to   { opacity: 1; transform: translateY(0) }
 }
 
-/* ── Logo ────────────────────────────────────────────────────── */
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
+/* Logo */
+.logo-wrap {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 28px;
 }
-
-.logo-icon {
-  width: 36px; height: 36px;
+.logo-mark {
+  width: 40px; height: 40px;
+  border-radius: 50%;
   background: var(--accent);
-  border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-
-.logo-icon svg { width: 18px; height: 18px; }
-
-.logo-name {
-  font-family: 'Instrument Serif', Georgia, serif;
-  font-size: 16px;
-  color: var(--text);
-  line-height: 1.2;
+.logo-mark-text {
+  font-size: 13px; font-weight: 700;
+  color: #fff; letter-spacing: 0.05em;
 }
-
-.logo-name span {
-  display: block;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text3);
-  letter-spacing: 0.3px;
+.logo-name {
+  font-size: 16px; font-weight: 600;
+  letter-spacing: -0.3px; color: var(--text);
+}
+.logo-sub {
+  font-size: 12px; color: var(--muted);
   margin-top: 1px;
 }
 
-/* ── Heading ─────────────────────────────────────────────────── */
-.heading {
-  font-family: 'Instrument Serif', Georgia, serif;
-  font-size: 28px;
-  color: var(--text);
-  line-height: 1.15;
-  margin-bottom: 8px;
+h1 {
+  font-size: 22px; font-weight: 600;
+  letter-spacing: -0.5px; color: var(--text);
+  margin-bottom: 6px;
+}
+.subtitle {
+  font-size: 13px; color: var(--muted);
+  margin-bottom: 28px; line-height: 1.5;
 }
 
-.subheading {
-  font-size: 13px;
-  color: var(--text2);
-  line-height: 1.5;
-  margin-bottom: 32px;
-}
-
-/* ── Form ────────────────────────────────────────────────────── */
-.field {
-  margin-bottom: 14px;
-}
-
-.field label {
+label {
   display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
-  letter-spacing: 0.3px;
-  margin-bottom: 7px;
+  font-size: 12px; font-weight: 500;
+  color: var(--text2); letter-spacing: 0.1px;
+  margin-bottom: 6px;
 }
-
-.field input {
+.input-wrap { margin-bottom: 14px }
+input[type="text"],
+input[type="password"] {
   width: 100%;
-  background: var(--surface);
+  background: var(--bg);
   border: 1px solid var(--border2);
-  border-radius: var(--r);
+  border-radius: var(--r-sm);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  font-weight: 400;
+  font-family: var(--font);
+  font-size: 15px; font-weight: 400;
   padding: 12px 14px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.2s;
   -webkit-appearance: none;
+  appearance: none;
 }
+input::placeholder { color: var(--muted2) }
+input:focus { border-color: var(--accent) }
 
-.field input::placeholder { color: var(--text3); }
-
-.field input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(232,255,71,0.08);
-}
-
-/* ── Error ───────────────────────────────────────────────────── */
-.error-msg {
-  display: none;
-  font-size: 12px;
-  color: var(--red);
-  background: rgba(255,85,85,0.07);
-  border: 1px solid rgba(255,85,85,0.18);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 16px;
-  line-height: 1.4;
-}
-.error-msg.visible { display: block; }
-
-/* ── Submit button ───────────────────────────────────────────── */
 .submit-btn {
   width: 100%;
-  background: var(--accent);
-  color: #0A0A0A;
-  border: none;
-  border-radius: var(--r);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: var(--r-sm);
+  font-family: var(--font);
+  font-size: 15px; font-weight: 600;
   padding: 14px;
-  margin-top: 8px;
+  margin-top: 6px;
+  transition: opacity 0.2s, transform 0.1s;
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-  position: relative;
-  overflow: hidden;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  -webkit-tap-highlight-color: transparent;
 }
+.submit-btn:active { opacity: 0.85; transform: scale(0.99) }
+.submit-btn:disabled { opacity: 0.4; cursor: default }
 
-.submit-btn:hover { opacity: 0.9; }
-.submit-btn:active { transform: scale(0.98); opacity: 0.8; }
-.submit-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
-
-/* Loading spinner inside button */
-.submit-btn .spinner {
-  display: none;
+.spinner {
   width: 16px; height: 16px;
-  border: 2px solid rgba(0,0,0,0.3);
-  border-top-color: #000;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
-  position: absolute;
-  right: 16px; top: 50%; transform: translateY(-50%);
+  display: none;
 }
-.submit-btn.loading .spinner { display: block; }
-.submit-btn.loading .btn-text { opacity: 0.6; }
+.spinner.show { display: block }
+@keyframes spin { to { transform: rotate(360deg) } }
 
-@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+.error-msg {
+  display: none;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.2);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: 13px; color: var(--red);
+  margin-bottom: 14px;
+}
+.error-msg.show { display: block }
 
-/* ── Divider ─────────────────────────────────────────────────── */
 .divider {
-  height: 1px;
-  background: var(--border);
-  margin: 28px 0 20px;
+  height: 1px; background: var(--border);
+  margin: 24px 0 20px;
 }
-
-/* ── Footer ──────────────────────────────────────────────────── */
-.footer {
-  font-size: 11px; color: var(--text3);
-  text-align: center;
-  letter-spacing: 0.2px;
+.footer-note {
+  font-size: 11px; color: var(--muted);
+  text-align: center; line-height: 1.5;
 }
 </style>
 </head>
 <body>
-
 <div class="card">
-  <!-- Logo -->
-  <div class="logo">
-    <div class="logo-icon">
-      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M11 2L4 10h6l-1 6 9-10h-6l2-4z" fill="#0A0A0A" stroke="#0A0A0A" stroke-width="0.5" stroke-linejoin="round"/>
-      </svg>
+  <div class="logo-wrap">
+    <div class="logo-mark">
+      <span class="logo-mark-text">YDA</span>
     </div>
-    <div class="logo-name">
-      AI News
-      <span>Dmitrii Yudin · AI Strategy</span>
+    <div>
+      <div class="logo-name">YDA AI News</div>
+      <div class="logo-sub">Dmitrii Yudin · AI Strategy</div>
     </div>
   </div>
 
-  <!-- Heading -->
-  <div class="heading">Добро пожаловать</div>
-  <div class="subheading">Доступ только для авторизованных пользователей</div>
+  <h1>Sign in</h1>
+  <p class="subtitle">Access your personal AI news dashboard</p>
 
-  <!-- Error -->
-  <div class="error-msg" id="error-msg">Неверный логин или пароль</div>
+  <div class="error-msg" id="err-msg">Incorrect username or password</div>
 
-  <!-- Form -->
-  <form id="login-form" autocomplete="on">
-    <div class="field">
-      <label for="username">Логин</label>
-      <input
-        type="text"
-        id="username"
-        name="username"
-        placeholder="Введите логин"
-        autocomplete="username"
-        autocapitalize="none"
-        spellcheck="false"
-        required
-      >
+  <form id="login-form" onsubmit="doLogin(event)">
+    <div class="input-wrap">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
     </div>
-    <div class="field">
-      <label for="password">Пароль</label>
-      <input
-        type="password"
-        id="password"
-        name="password"
-        placeholder="Введите пароль"
-        autocomplete="current-password"
-        required
-      >
+    <div class="input-wrap">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Enter password" autocomplete="current-password" required>
     </div>
-
     <button type="submit" class="submit-btn" id="submit-btn">
-      <span class="btn-text">Войти</span>
-      <span class="spinner"></span>
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-label">Sign in</span>
     </button>
   </form>
 
   <div class="divider"></div>
-  <div class="footer">Private Access · AI Strategy &amp; Growth</div>
+  <p class="footer-note">YDA · AI Strategy &amp; Growth</p>
 </div>
 
 <script>
-const form    = document.getElementById('login-form');
-const btn     = document.getElementById('submit-btn');
-const errMsg  = document.getElementById('error-msg');
-
-// Показываем ошибку если ?error=1 в URL
-if (new URLSearchParams(location.search).get('error') === '1') {
-  errMsg.classList.add('visible');
-}
-
-form.addEventListener('submit', async (e) => {
+async function doLogin(e) {
   e.preventDefault();
-  errMsg.classList.remove('visible');
-  btn.disabled = true;
-  btn.classList.add('loading');
-
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-
+  const btn=document.getElementById('submit-btn');
+  const lbl=document.getElementById('btn-label');
+  const spin=document.getElementById('spinner');
+  const err=document.getElementById('err-msg');
+  const u=document.getElementById('username').value.trim();
+  const p=document.getElementById('password').value;
+  err.classList.remove('show');
+  btn.disabled=true; lbl.textContent='Signing in...'; spin.classList.add('show');
   try {
-    const res = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-      credentials: 'include',
+    const params=new URLSearchParams(window.location.search);
+    const next=params.get('next')||'/';
+    const r=await fetch('/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body:JSON.stringify({username:u,password:p})
     });
-    const data = await res.json();
-    if (data.ok) {
-      // Редирект на главную
-      const next = new URLSearchParams(location.search).get('next') || '/';
-      window.location.href = next;
-    } else {
-      errMsg.classList.add('visible');
-      btn.disabled = false;
-      btn.classList.remove('loading');
-      document.getElementById('password').value = '';
-      document.getElementById('password').focus();
-    }
-  } catch (err) {
-    errMsg.textContent = 'Ошибка соединения. Попробуйте ещё раз.';
-    errMsg.classList.add('visible');
-    btn.disabled = false;
-    btn.classList.remove('loading');
+    const data=await r.json();
+    if (data.ok) { window.location.href=next; }
+    else { throw new Error(data.error||'Invalid credentials'); }
+  } catch(ex) {
+    err.textContent=ex.message||'Incorrect username or password';
+    err.classList.add('show');
+    btn.disabled=false; lbl.textContent='Sign in'; spin.classList.remove('show');
   }
-});
+}
 </script>
 </body>
 </html>
