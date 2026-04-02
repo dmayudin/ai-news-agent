@@ -78,32 +78,29 @@ input { font-family: var(--font) }
 }
 
 /* YDA Logo */
-.brand { display: flex; align-items: center; gap: 10px }
+.brand { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1 }
 .brand-logo {
-  width: 32px; height: 32px;
+  width: 34px; height: 34px;
   border-radius: 50%;
-  background: var(--accent);
-  display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 0 0 rgba(41,186,116,0);
-  transition: box-shadow 0.3s;
+  overflow: hidden;
 }
-.brand-logo:active { box-shadow: 0 0 0 4px rgba(41,186,116,0.15) }
-.brand-logo-text {
-  font-family: var(--font);
-  font-size: 11px; font-weight: 700;
-  color: #fff; letter-spacing: 0.05em;
-  line-height: 1;
+.brand-logo img {
+  width: 100%; height: 100%;
+  display: block; object-fit: cover;
 }
 .brand-name {
-  font-size: 14px; font-weight: 600;
-  letter-spacing: -0.3px; color: var(--text);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: -0.2px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .brand-name span { color: var(--muted); font-weight: 400 }
 
 .header-status {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--muted);
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--muted);
+  flex-shrink: 0; max-width: 160px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .status-dot {
   width: 6px; height: 6px; border-radius: 50%;
@@ -730,7 +727,7 @@ input[type="time"] { min-height: 44px }
   <div class="header-row">
     <div class="brand">
       <div class="brand-logo">
-        <span class="brand-logo-text">YDA</span>
+        <img src="/icons/icon-192.png?v=3" alt="YDA" width="34" height="34">
       </div>
       <div class="brand-name">AI News <span>/ Dmitrii Yudin</span></div>
     </div>
