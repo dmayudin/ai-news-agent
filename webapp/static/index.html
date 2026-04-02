@@ -73,8 +73,9 @@ input { font-family: var(--font) }
 }
 .header-row {
   display: flex; align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
+  overflow: hidden;
 }
 
 /* YDA Logo */
@@ -99,7 +100,11 @@ input { font-family: var(--font) }
 .header-status {
   display: flex; align-items: center; gap: 5px;
   font-size: 10px; color: var(--muted);
-  flex-shrink: 0; max-width: 160px;
+  flex-shrink: 0;
+  min-width: 0; max-width: 48%;
+  overflow: hidden;
+}
+.header-status span {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .status-dot {
@@ -700,6 +705,124 @@ mark {
 .hint-box-text { font-size: 12px; color: var(--muted); line-height: 1.55 }
 .hint-box-text strong { color: var(--text2); font-weight: 500 }
 
+/* ── PROGRESS BAR ── */
+.gen-progress {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 0 20px;
+}
+.gen-progress.show { display: flex }
+.gen-progress-label {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--accent);
+}
+.gen-progress-title {
+  font-size: 18px; font-weight: 600;
+  letter-spacing: -0.4px; color: var(--text);
+}
+.gen-progress-step {
+  font-size: 13px; color: var(--muted);
+  min-height: 20px;
+  transition: opacity 0.3s;
+}
+.gen-progress-track {
+  height: 3px;
+  background: var(--border2);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.gen-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 100px;
+  width: 0%;
+  transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.gen-progress-steps {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.gen-step-item {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--muted2);
+  transition: color 0.3s;
+}
+.gen-step-item.active { color: var(--text2) }
+.gen-step-item.done   { color: var(--accent) }
+.gen-step-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--muted2); flex-shrink: 0;
+  transition: background 0.3s;
+}
+.gen-step-item.active .gen-step-dot { background: var(--accent); animation: pulse 0.8s infinite }
+.gen-step-item.done   .gen-step-dot { background: var(--accent); animation: none }
+
+/* ── MAIN/ANALYTICS TAB ── */
+.main-hero {
+  padding: 28px 0 20px;
+}
+.main-hero-label {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px;
+}
+.main-hero-title {
+  font-size: 22px; font-weight: 600;
+  letter-spacing: -0.5px; color: var(--text);
+  line-height: 1.25; margin-bottom: 6px;
+}
+.main-hero-sub {
+  font-size: 13px; color: var(--muted); line-height: 1.55;
+}
+.main-cards {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 16px;
+}
+.main-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+}
+.main-stat-value {
+  font-size: 28px; font-weight: 700;
+  letter-spacing: -1px; color: var(--text);
+  margin-bottom: 2px;
+}
+.main-stat-label {
+  font-size: 11px; color: var(--muted);
+  font-weight: 500;
+}
+.main-stat-delta {
+  font-size: 11px; color: var(--accent);
+  margin-top: 4px;
+}
+.main-coming-soon {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 32px 20px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.main-coming-icon {
+  width: 48px; height: 48px;
+  background: var(--accent-dim);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.main-coming-icon svg { width: 22px; height: 22px; color: var(--accent) }
+.main-coming-title {
+  font-size: 16px; font-weight: 600;
+  letter-spacing: -0.3px; color: var(--text);
+  margin-bottom: 6px;
+}
+.main-coming-sub {
+  font-size: 13px; color: var(--muted); line-height: 1.55;
+}
+
 /* ── SAFARI FIXES ── */
 @supports (-webkit-touch-callout: none) {
   .bottom-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)) }
@@ -777,6 +900,39 @@ input[type="time"] { min-height: 44px }
     <div id="news-list"></div>
   </div>
 
+  <!-- MAIN TAB -->
+  <div id="tab-main" style="display:none">
+    <div class="tab-panel">
+      <div class="main-hero">
+        <div class="main-hero-label">Dashboard</div>
+        <div class="main-hero-title">Overview</div>
+        <div class="main-hero-sub">Your content performance and publishing stats.</div>
+      </div>
+      <div class="main-cards">
+        <div class="main-stat-card">
+          <div class="main-stat-value" id="stat-posts">—</div>
+          <div class="main-stat-label">Posts published</div>
+          <div class="main-stat-delta">This week</div>
+        </div>
+        <div class="main-stat-card">
+          <div class="main-stat-value" id="stat-articles">—</div>
+          <div class="main-stat-label">Articles read</div>
+          <div class="main-stat-delta">Today</div>
+        </div>
+      </div>
+      <div class="main-coming-soon">
+        <div class="main-coming-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 3v18h18"/>
+            <path d="m19 9-5 5-4-4-3 3"/>
+          </svg>
+        </div>
+        <div class="main-coming-title">Analytics coming soon</div>
+        <div class="main-coming-sub">Reach, engagement, and content performance metrics will appear here once connected to your channels.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- GENERATE TAB -->
   <div id="tab-generate" style="display:none">
     <div class="tab-panel">
@@ -785,6 +941,16 @@ input[type="time"] { min-height: 44px }
         <div class="gen-hero-label">Content Studio</div>
         <div class="gen-hero-title">Create &amp; Publish</div>
         <div class="gen-hero-sub">Generate posts and digests from the latest AI news.</div>
+      </div>
+
+      <!-- Progress bar (shown during generation) -->
+      <div class="gen-progress" id="gen-progress">
+        <div class="gen-progress-label" id="prog-label">Generating</div>
+        <div class="gen-progress-title" id="prog-title">Writing post...</div>
+        <div class="gen-progress-track">
+          <div class="gen-progress-fill" id="prog-fill"></div>
+        </div>
+        <div class="gen-progress-steps" id="prog-steps"></div>
       </div>
 
       <!-- Generate buttons (shown when no content yet) -->
@@ -869,24 +1035,35 @@ input[type="time"] { min-height: 44px }
 </div>
 
 <!-- BOTTOM NAV -->
-<div class="bottom-nav">
-  <button class="nav-item on" id="nav-news" onclick="showTab('news')">
-    <div class="nav-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M4 6h16M4 10h16M4 14h10M4 18h7"/>
-      </svg>
-    </div>
-    News
-  </button>
-  <button class="nav-item" id="nav-generate" onclick="showTab('generate')">
-    <div class="nav-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-      </svg>
-    </div>
-    Generate
-  </button>
-</div>
+<nav class="bottom-nav">
+    <button class="nav-item on" id="nav-news" onclick="showTab('news')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M4 6h16M4 12h16M4 18h10"/>
+        </svg>
+      </div>
+      News
+    </button>
+    <button class="nav-item" id="nav-generate" onclick="showTab('generate')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+      </div>
+      Generate
+    </button>
+    <button class="nav-item" id="nav-main" onclick="showTab('main')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </div>
+      Main
+    </button>
+  </nav>
 
 <script>
 const tg = window.Telegram?.WebApp;
@@ -972,12 +1149,12 @@ function detectCat(item) {
 
 // ── Tab switching with animation ──
 function showTab(name) {
-  ['news','generate'].forEach(t => {
+  ['news','generate','main'].forEach(t => {
     const panel = document.getElementById('tab-'+t);
     const nav   = document.getElementById('nav-'+t);
+    if (!panel || !nav) return;
     if (t === name) {
       panel.style.display = '';
-      // Re-trigger animation
       const inner = panel.querySelector('.tab-panel');
       if (inner) { inner.style.animation='none'; inner.offsetHeight; inner.style.animation='' }
     } else {
@@ -989,6 +1166,10 @@ function showTab(name) {
   document.getElementById('search-row').style.display  = (isNews&&allNews.length)?'':'none';
   document.getElementById('filters').style.display     = (isNews&&allNews.length)?'':'none';
   document.getElementById('stats-row').style.display   = (isNews&&allNews.length)?'':'none';
+  // Update stats on main tab
+  if (name==='main') {
+    document.getElementById('stat-articles').textContent = allNews.length || '—';
+  }
 }
 
 // ── Filters ──
@@ -1148,30 +1329,67 @@ async function generateFromSelected(type) {
   if (selectedIds.size===0) return;
   const ids = Array.from(selectedIds);
   showTab('generate');
-  document.getElementById('gen-buttons').style.display='none';
   document.getElementById('content-panel').style.display='none';
+  document.getElementById('publish-result').style.display='none';
   const btn = document.getElementById(type==='post'?'btn-post':'btn-digest');
-  if (btn) { btn.disabled=true; }
-  // Show loading state in generate tab
-  const panel=document.getElementById('content-panel'), title=document.getElementById('content-panel-title');
-  const text=document.getElementById('content-text'), pubRes=document.getElementById('publish-result');
-  pubRes.style.display='none';
+  if (btn) btn.disabled=true;
+  const progressInterval = showProgress(type);
   try {
     const r=await fetch('/api/generate?type='+type,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selected_ids:ids})});
     const data=await r.json();
+    hideProgress(progressInterval);
     if (!data.ok) throw new Error(data.error||'Error');
     generatedContent=data.content; generatedType=type;
-    title.textContent=type==='post'?'Post':'Digest';
+    document.getElementById('content-panel-title').textContent=type==='post'?'Post':'Digest';
     document.getElementById('content-panel-badge').textContent='Draft';
-    text.innerHTML=renderContent(generatedContent);
-    panel.style.display='';
+    document.getElementById('content-text').innerHTML=renderContent(generatedContent);
+    document.getElementById('gen-buttons').style.display='none';
+    document.getElementById('content-panel').style.display='';
     document.getElementById('btn-publish').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
   } catch(e) {
+    hideProgress(progressInterval);
     document.getElementById('gen-buttons').style.display='';
     alert('Error: '+e.message);
   }
-  if (btn) { btn.disabled=false; }
+  if (btn) btn.disabled=false;
+}
+
+// ── Progress bar helpers ──
+function showProgress(type) {
+  const steps = type==='post'
+    ? ['Selecting relevant articles','Analysing key insights','Writing post draft','Polishing content']
+    : ['Collecting top articles','Building structure','Writing digest sections','Final review'];
+  const fill = document.getElementById('prog-fill');
+  const stepsEl = document.getElementById('prog-steps');
+  document.getElementById('prog-label').textContent = 'Generating';
+  document.getElementById('prog-title').textContent = type==='post' ? 'Writing post...' : 'Building digest...';
+  stepsEl.innerHTML = steps.map((s,i)=>`<div class="gen-step-item" id="pstep-${i}"><div class="gen-step-dot"></div>${s}</div>`).join('');
+  fill.style.width = '0%';
+  document.getElementById('gen-progress').classList.add('show');
+  document.getElementById('gen-buttons').style.display='none';
+  // Animate steps
+  const total = steps.length;
+  let cur = 0;
+  const interval = setInterval(()=>{
+    if (cur < total) {
+      if (cur > 0) document.getElementById('pstep-'+(cur-1))?.classList.replace('active','done');
+      document.getElementById('pstep-'+cur)?.classList.add('active');
+      fill.style.width = Math.round(((cur+1)/total)*85) + '%';
+      cur++;
+    }
+  }, 900);
+  return interval;
+}
+function hideProgress(interval) {
+  if (interval) clearInterval(interval);
+  const fill = document.getElementById('prog-fill');
+  fill.style.width = '100%';
+  // Mark last step done
+  document.querySelectorAll('.gen-step-item.active').forEach(el=>el.classList.replace('active','done'));
+  setTimeout(()=>{
+    document.getElementById('gen-progress').classList.remove('show');
+  }, 400);
 }
 
 // ── Generate (Generate tab buttons) ──
@@ -1180,12 +1398,11 @@ async function doGenerate(type) {
   const panel=document.getElementById('content-panel'), title=document.getElementById('content-panel-title');
   const text=document.getElementById('content-text'), pubRes=document.getElementById('publish-result');
   btn.disabled=true;
-  // Show loading text in button
-  const origTitle = btn.querySelector('.gen-card-title');
-  if (origTitle) origTitle.textContent = type==='post'?'Writing...':'Building...';
   panel.style.display='none'; pubRes.style.display='none';
+  const progressInterval = showProgress(type);
   try {
     const r=await fetch('/api/generate?type='+type), data=await r.json();
+    hideProgress(progressInterval);
     if (!data.ok) throw new Error(data.error||'Error');
     generatedContent=data.content; generatedType=type;
     title.textContent=type==='post'?'Post':'Digest';
@@ -1195,9 +1412,12 @@ async function doGenerate(type) {
     panel.style.display='';
     document.getElementById('btn-publish').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
-  } catch(e) { alert('Error: '+e.message); }
+  } catch(e) {
+    hideProgress(progressInterval);
+    document.getElementById('gen-buttons').style.display='';
+    alert('Error: '+e.message);
+  }
   btn.disabled=false;
-  if (origTitle) origTitle.textContent = type==='post'?'Post':'Digest';
 }
 
 function onContentEdit() { generatedContent=getEditedText(); }
@@ -1268,6 +1488,7 @@ async function doSchedule() {
 
 function discardContent() {
   document.getElementById('content-panel').style.display='none';
+  document.getElementById('gen-progress').classList.remove('show');
   document.getElementById('gen-buttons').style.display='';
   generatedContent=''; generatedType='';
 }
