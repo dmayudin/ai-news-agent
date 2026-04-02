@@ -133,8 +133,38 @@ def _li_publish(text: str) -> dict:
     token = _li_get_valid_token()
     t = _li_load_tokens()
     sub = t.get('sub', '')
+    # If sub is missing, try to fetch it now (handles case where userinfo timed out during OAuth)
     if not sub:
-        raise RuntimeError('LinkedIn person URN not found — re-authorize')
+        headers_auth = {'Authorization': f'Bearer {token}'}
+        # Try /v2/userinfo first
+        try:
+            ui = requests.get('https://api.linkedin.com/v2/userinfo',
+                              headers=headers_auth, timeout=30).json()
+            sub = ui.get('sub', '')
+            if sub:
+                t['sub'] = sub
+                t['name'] = t.get('name') or ui.get('name', '')
+                _li_save_tokens(t)
+                logger.info('Fetched LinkedIn sub from userinfo: %s', sub)
+        except Exception as e:
+            logger.warning('userinfo fetch in publish: %s', e)
+        # Fallback: /v2/me
+        if not sub:
+            try:
+                me = requests.get('https://api.linkedin.com/v2/me',
+                                  headers=headers_auth, timeout=30).json()
+                sub = me.get('id', '')
+                if sub:
+                    t['sub'] = sub
+                    fn = me.get('localizedFirstName', '')
+                    ln = me.get('localizedLastName', '')
+                    t['name'] = t.get('name') or f'{fn} {ln}'.strip()
+                    _li_save_tokens(t)
+                    logger.info('Fetched LinkedIn sub from /v2/me: %s', sub)
+            except Exception as e:
+                logger.warning('/v2/me fetch in publish: %s', e)
+        if not sub:
+            raise RuntimeError('LinkedIn person URN not found — re-authorize')
     payload = {
         'author': f'urn:li:person:{sub}',
         'lifecycleState': 'PUBLISHED',
