@@ -823,6 +823,262 @@ mark {
   font-size: 13px; color: var(--muted); line-height: 1.55;
 }
 
+/* ── SETTINGS TAB ── */
+.settings-section {
+  margin-bottom: 20px;
+}
+.settings-section-label {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+  padding: 0 2px;
+}
+.settings-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.settings-item {
+  display: flex; align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  min-height: 52px;
+}
+.settings-item:last-child { border-bottom: none }
+.settings-item-icon {
+  width: 32px; height: 32px;
+  background: var(--surface2);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.settings-item-icon svg { width: 16px; height: 16px; color: var(--text2) }
+.settings-item-body { flex: 1; min-width: 0 }
+.settings-item-title {
+  font-size: 14px; font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.settings-item-sub {
+  font-size: 11px; color: var(--muted); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.settings-item-action {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+}
+.settings-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 20px;
+  background: var(--accent-dim); color: var(--accent);
+}
+.settings-badge.inactive {
+  background: var(--surface3); color: var(--muted);
+}
+.settings-chevron { color: var(--muted2) }
+.settings-chevron svg { width: 14px; height: 14px }
+.settings-input-row {
+  display: flex; gap: 8px; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-input-row:last-child { border-bottom: none }
+.settings-input {
+  flex: 1; background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 13px; color: var(--text);
+  font-family: var(--font);
+  outline: none;
+}
+.settings-input:focus { border-color: var(--accent) }
+.settings-input::placeholder { color: var(--muted2) }
+.settings-save-btn {
+  background: var(--accent); color: #000;
+  border: none; border-radius: var(--r-sm);
+  padding: 10px 16px; font-size: 13px; font-weight: 600;
+  font-family: var(--font); cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--transition);
+}
+.settings-save-btn:active { opacity: 0.75 }
+.settings-save-btn.secondary {
+  background: var(--surface3); color: var(--text2);
+}
+/* Model selector */
+.model-provider {
+  margin-bottom: 12px;
+}
+.model-provider-label {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px; padding: 0 2px;
+}
+.model-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.model-item {
+  display: flex; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px; cursor: pointer;
+  transition: background var(--transition);
+}
+.model-item:last-child { border-bottom: none }
+.model-item:active { background: var(--surface2) }
+.model-item.selected { background: var(--accent-dim) }
+.model-radio {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color var(--transition);
+}
+.model-item.selected .model-radio {
+  border-color: var(--accent);
+}
+.model-radio-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); opacity: 0;
+  transition: opacity var(--transition);
+}
+.model-item.selected .model-radio-dot { opacity: 1 }
+.model-info { flex: 1; min-width: 0 }
+.model-name {
+  font-size: 13px; font-weight: 500; color: var(--text);
+}
+.model-note {
+  font-size: 11px; color: var(--muted); margin-top: 1px;
+}
+.model-meta {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.model-ctx {
+  font-size: 10px; color: var(--muted2);
+  background: var(--surface3); padding: 2px 6px;
+  border-radius: 4px;
+}
+/* Billing section */
+.billing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px;
+  margin-bottom: 12px;
+}
+.billing-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.billing-card-title {
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  text-transform: uppercase; letter-spacing: 0.6px;
+}
+.billing-card-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 20px;
+  background: var(--accent-dim); color: var(--accent);
+}
+.billing-metric {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.billing-metric:last-child { border-bottom: none; padding-bottom: 0 }
+.billing-metric-label { font-size: 13px; color: var(--muted) }
+.billing-metric-value {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.billing-metric-value.accent { color: var(--accent) }
+/* Channel stats */
+.channel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 16px;
+}
+.channel-avatar {
+  width: 48px; height: 48px;
+  background: var(--accent-dim);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.channel-avatar svg { width: 22px; height: 22px; color: var(--accent) }
+.channel-info { flex: 1; min-width: 0 }
+.channel-name {
+  font-size: 15px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.channel-handle {
+  font-size: 12px; color: var(--muted); margin-top: 2px;
+}
+.channel-subs {
+  text-align: right; flex-shrink: 0;
+}
+.channel-subs-value {
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -0.5px; color: var(--text);
+}
+.channel-subs-label {
+  font-size: 11px; color: var(--muted); margin-top: 1px;
+}
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px; margin-bottom: 12px;
+}
+.stats-mini-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 14px 12px;
+  text-align: center;
+}
+.stats-mini-value {
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -0.5px; color: var(--text);
+}
+.stats-mini-label {
+  font-size: 10px; color: var(--muted);
+  margin-top: 3px; text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.activity-list { margin-top: 4px }
+.activity-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.activity-item:last-child { border-bottom: none }
+.activity-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); flex-shrink: 0;
+  margin-top: 4px;
+}
+.activity-dot.digest { background: var(--blue) }
+.activity-body { flex: 1; min-width: 0 }
+.activity-type {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--muted); margin-bottom: 2px;
+}
+.activity-preview {
+  font-size: 13px; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.activity-time {
+  font-size: 11px; color: var(--muted2);
+  flex-shrink: 0; margin-top: 2px;
+}
+
 /* ── SAFARI FIXES ── */
 @supports (-webkit-touch-callout: none) {
   .bottom-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)) }
@@ -905,31 +1161,153 @@ input[type="time"] { min-height: 44px }
     <div class="tab-panel">
       <div class="main-hero">
         <div class="main-hero-label">Dashboard</div>
-        <div class="main-hero-title">Overview</div>
-        <div class="main-hero-sub">Your content performance and publishing stats.</div>
+        <div class="main-hero-title">Analytics</div>
+        <div class="main-hero-sub">Channel performance and publishing activity.</div>
       </div>
-      <div class="main-cards">
-        <div class="main-stat-card">
-          <div class="main-stat-value" id="stat-posts">—</div>
-          <div class="main-stat-label">Posts published</div>
-          <div class="main-stat-delta">This week</div>
-        </div>
-        <div class="main-stat-card">
-          <div class="main-stat-value" id="stat-articles">—</div>
-          <div class="main-stat-label">Articles read</div>
-          <div class="main-stat-delta">Today</div>
-        </div>
-      </div>
-      <div class="main-coming-soon">
-        <div class="main-coming-icon">
+
+      <!-- Channel card -->
+      <div class="channel-card" id="channel-card">
+        <div class="channel-avatar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M3 3v18h18"/>
-            <path d="m19 9-5 5-4-4-3 3"/>
+            <path d="m22 2-7 20-4-9-9-4 20-7z"/>
           </svg>
         </div>
-        <div class="main-coming-title">Analytics coming soon</div>
-        <div class="main-coming-sub">Reach, engagement, and content performance metrics will appear here once connected to your channels.</div>
+        <div class="channel-info">
+          <div class="channel-name" id="channel-name">Loading...</div>
+          <div class="channel-handle" id="channel-handle"></div>
+        </div>
+        <div class="channel-subs">
+          <div class="channel-subs-value" id="channel-subs">—</div>
+          <div class="channel-subs-label">subscribers</div>
+        </div>
       </div>
+
+      <!-- Stats grid -->
+      <div class="stats-grid">
+        <div class="stats-mini-card">
+          <div class="stats-mini-value" id="stat-posts">—</div>
+          <div class="stats-mini-label">Posts</div>
+        </div>
+        <div class="stats-mini-card">
+          <div class="stats-mini-value" id="stat-digests">—</div>
+          <div class="stats-mini-label">Digests</div>
+        </div>
+        <div class="stats-mini-card">
+          <div class="stats-mini-value" id="stat-articles">—</div>
+          <div class="stats-mini-label">Articles</div>
+        </div>
+      </div>
+
+      <!-- Billing card -->
+      <div class="billing-card">
+        <div class="billing-card-header">
+          <div class="billing-card-title">API Usage</div>
+          <div class="billing-card-badge" id="billing-model-badge">Loading...</div>
+        </div>
+        <div class="billing-metric">
+          <div class="billing-metric-label">Tokens used</div>
+          <div class="billing-metric-value" id="billing-tokens">—</div>
+        </div>
+        <div class="billing-metric">
+          <div class="billing-metric-label">Requests</div>
+          <div class="billing-metric-value" id="billing-requests">—</div>
+        </div>
+        <div class="billing-metric">
+          <div class="billing-metric-label">Estimated cost</div>
+          <div class="billing-metric-value accent" id="billing-cost">—</div>
+        </div>
+        <div class="billing-metric">
+          <div class="billing-metric-label">Price (input / output)</div>
+          <div class="billing-metric-value" id="billing-price">—</div>
+        </div>
+      </div>
+
+      <!-- Activity feed -->
+      <div class="settings-section">
+        <div class="settings-section-label">Recent activity</div>
+        <div class="settings-row">
+          <div class="activity-list" id="activity-list">
+            <div class="settings-item">
+              <div class="settings-item-body">
+                <div class="settings-item-title" style="color:var(--muted)">No activity yet</div>
+                <div class="settings-item-sub">Published posts will appear here</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="tab-settings" style="display:none">
+    <div class="tab-panel">
+      <div class="main-hero">
+        <div class="main-hero-label">Configuration</div>
+        <div class="main-hero-title">Settings</div>
+        <div class="main-hero-sub">API keys, models, and integrations.</div>
+      </div>
+
+      <!-- API Keys -->
+      <div class="settings-section">
+        <div class="settings-section-label">API Keys</div>
+        <div class="settings-row">
+          <div class="settings-input-row">
+            <input class="settings-input" type="password" id="set-openai-key" placeholder="OpenAI API key (sk-...)">
+            <button class="settings-save-btn" onclick="saveApiKey('openai')">Save</button>
+          </div>
+          <div class="settings-input-row">
+            <input class="settings-input" type="password" id="set-cloudru-key" placeholder="Cloud.ru API key">
+            <button class="settings-save-btn" onclick="saveApiKey('cloudru')">Save</button>
+          </div>
+          <div class="settings-input-row">
+            <input class="settings-input" type="password" id="set-openrouter-key" placeholder="OpenRouter API key (sk-or-...)">
+            <button class="settings-save-btn" onclick="saveApiKey('openrouter')">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model selector -->
+      <div class="settings-section">
+        <div class="settings-section-label">Active model</div>
+        <div id="model-selector-container">Loading models...</div>
+      </div>
+
+      <!-- Channel -->
+      <div class="settings-section">
+        <div class="settings-section-label">Telegram channel</div>
+        <div class="settings-row">
+          <div class="settings-input-row">
+            <input class="settings-input" type="text" id="set-channel" placeholder="@channel_name">
+            <button class="settings-save-btn" onclick="saveChannel()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrations -->
+      <div class="settings-section">
+        <div class="settings-section-label">Integrations</div>
+        <div class="settings-row">
+          <div class="settings-item" onclick="connectLinkedIn()" style="cursor:pointer">
+            <div class="settings-item-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            </div>
+            <div class="settings-item-body">
+              <div class="settings-item-title">LinkedIn</div>
+              <div class="settings-item-sub" id="li-settings-status">Not connected</div>
+            </div>
+            <div class="settings-item-action">
+              <div class="settings-badge inactive" id="li-settings-badge">Connect</div>
+              <div class="settings-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save result -->
+      <div id="settings-result" style="display:none; margin-bottom:16px"></div>
+
     </div>
   </div>
 
@@ -1055,13 +1433,19 @@ input[type="time"] { min-height: 44px }
     <button class="nav-item" id="nav-main" onclick="showTab('main')">
       <div class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
+          <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
         </svg>
       </div>
-      Main
+      Analytics
+    </button>
+    <button class="nav-item" id="nav-settings" onclick="showTab('settings')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+      Settings
     </button>
   </nav>
 
@@ -1149,7 +1533,7 @@ function detectCat(item) {
 
 // ── Tab switching with animation ──
 function showTab(name) {
-  ['news','generate','main'].forEach(t => {
+  ['news','generate','main','settings'].forEach(t => {
     const panel = document.getElementById('tab-'+t);
     const nav   = document.getElementById('nav-'+t);
     if (!panel || !nav) return;
@@ -1166,10 +1550,173 @@ function showTab(name) {
   document.getElementById('search-row').style.display  = (isNews&&allNews.length)?'':'none';
   document.getElementById('filters').style.display     = (isNews&&allNews.length)?'':'none';
   document.getElementById('stats-row').style.display   = (isNews&&allNews.length)?'':'none';
-  // Update stats on main tab
   if (name==='main') {
     document.getElementById('stat-articles').textContent = allNews.length || '—';
+    loadStats();
+    loadBilling();
   }
+  if (name==='settings') {
+    loadModels();
+    loadLinkedInStatus();
+  }
+}
+
+// ── Stats & Billing ──
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats', {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok) return;
+    document.getElementById('channel-name').textContent = d.channel_title || 'Channel';
+    document.getElementById('channel-handle').textContent = d.channel_username ? '@'+d.channel_username : '';
+    document.getElementById('channel-subs').textContent = d.subscribers >= 1000
+      ? (d.subscribers/1000).toFixed(1)+'K' : d.subscribers || '—';
+    document.getElementById('stat-posts').textContent = d.posts_published || '0';
+    document.getElementById('stat-digests').textContent = d.digests_published || '0';
+    // Activity feed
+    const list = document.getElementById('activity-list');
+    if (d.history && d.history.length > 0) {
+      const items = [...d.history].reverse().slice(0,10);
+      list.innerHTML = items.map(h => {
+        const dt = new Date(h.ts);
+        const timeStr = dt.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})+' '+dt.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+        const isDigest = h.type==='digest';
+        return `<div class="activity-item">
+          <div class="activity-dot${isDigest?' digest':''}"></div>
+          <div class="activity-body">
+            <div class="activity-type">${isDigest?'Digest':'Post'}</div>
+            <div class="activity-preview">${esc(h.preview||'')}</div>
+          </div>
+          <div class="activity-time">${timeStr}</div>
+        </div>`;
+      }).join('');
+    }
+  } catch(e) { console.warn('loadStats:', e) }
+}
+
+async function loadBilling() {
+  try {
+    const r = await fetch('/api/billing', {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok) return;
+    const modelLabel = d.current_model.split('/').pop();
+    document.getElementById('billing-model-badge').textContent = modelLabel;
+    document.getElementById('billing-tokens').textContent = d.tokens_used >= 1000
+      ? (d.tokens_used/1000).toFixed(1)+'K' : d.tokens_used || '0';
+    document.getElementById('billing-requests').textContent = d.requests_count || '0';
+    document.getElementById('billing-cost').textContent = '$'+(d.cost_usd||0).toFixed(4);
+    document.getElementById('billing-price').textContent =
+      '$'+d.price_per_1m_input+' / $'+d.price_per_1m_output+' per 1M';
+  } catch(e) { console.warn('loadBilling:', e) }
+}
+
+// ── Models ──
+let currentModel = '', currentProvider = '';
+async function loadModels() {
+  try {
+    const r = await fetch('/api/models', {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok) return;
+    currentModel = d.current_model;
+    currentProvider = d.current_provider;
+    const container = document.getElementById('model-selector-container');
+    container.innerHTML = d.models.map(prov => `
+      <div class="model-provider">
+        <div class="model-provider-label">${esc(prov.provider_label)}</div>
+        <div class="model-list">
+          ${prov.models.map(m => `
+            <div class="model-item${m.id===currentModel?' selected':''}" onclick="selectModel('${esc(prov.provider)}','${esc(m.id)}')">
+              <div class="model-radio"><div class="model-radio-dot"></div></div>
+              <div class="model-info">
+                <div class="model-name">${esc(m.label)}</div>
+                <div class="model-note">${esc(m.note)}</div>
+              </div>
+              <div class="model-meta">
+                <div class="model-ctx">${esc(m.context)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  } catch(e) { console.warn('loadModels:', e) }
+}
+
+async function selectModel(provider, modelId) {
+  try {
+    const r = await fetch('/api/settings', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({llm_model: modelId, llm_provider: provider})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      currentModel = modelId; currentProvider = provider;
+      document.querySelectorAll('.model-item').forEach(el => {
+        el.classList.toggle('selected', el.onclick?.toString().includes(modelId));
+      });
+      loadModels(); // re-render
+      showSettingsResult('✓ Model saved: '+modelId.split('/').pop(), false);
+    }
+  } catch(e) { showSettingsResult('Error: '+e.message, true) }
+}
+
+async function saveApiKey(provider) {
+  const inputMap = {openai:'set-openai-key', cloudru:'set-cloudru-key', openrouter:'set-openrouter-key'};
+  const keyMap   = {openai:'openai_api_key', cloudru:'cloudru_api_key', openrouter:'openrouter_api_key'};
+  const val = document.getElementById(inputMap[provider])?.value?.trim();
+  if (!val) return;
+  try {
+    const r = await fetch('/api/settings', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({[keyMap[provider]]: val})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById(inputMap[provider]).value = '';
+      showSettingsResult('✓ API key saved', false);
+    } else { showSettingsResult('Error: '+d.error, true) }
+  } catch(e) { showSettingsResult('Error: '+e.message, true) }
+}
+
+async function saveChannel() {
+  const val = document.getElementById('set-channel')?.value?.trim();
+  if (!val) return;
+  try {
+    const r = await fetch('/api/settings', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({channel_id: val})
+    });
+    const d = await r.json();
+    if (d.ok) showSettingsResult('✓ Channel saved: '+val, false);
+    else showSettingsResult('Error: '+d.error, true);
+  } catch(e) { showSettingsResult('Error: '+e.message, true) }
+}
+
+function showSettingsResult(msg, isErr) {
+  const el = document.getElementById('settings-result');
+  el.className = 'publish-result '+(isErr?'err':'ok');
+  el.textContent = msg;
+  el.style.display = 'flex';
+  setTimeout(()=>el.style.display='none', 3000);
+}
+
+async function loadLinkedInStatus() {
+  try {
+    const r = await fetch('/api/linkedin/status', {credentials:'include'});
+    const d = await r.json();
+    const badge = document.getElementById('li-settings-badge');
+    const sub   = document.getElementById('li-settings-status');
+    if (d.connected) {
+      badge.textContent = 'Connected';
+      badge.className = 'settings-badge';
+      sub.textContent = d.name || 'LinkedIn account';
+    } else {
+      badge.textContent = 'Connect';
+      badge.className = 'settings-badge inactive';
+      sub.textContent = 'Not connected';
+    }
+  } catch(e) {}
 }
 
 // ── Filters ──

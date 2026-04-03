@@ -557,6 +557,24 @@ def api_publish():
             raise RuntimeError(data.get('description', 'Telegram API error'))
 
         logger.info('Published to %s: %s...', CHANNEL_ID, text[:60])
+        # Записываем статистику
+        try:
+            stats = _load_stats()
+            post_type = body.get('post_type', 'post')
+            if post_type == 'digest':
+                stats['digests_published'] = stats.get('digests_published', 0) + 1
+            else:
+                stats['posts_published'] = stats.get('posts_published', 0) + 1
+            history = stats.get('history', [])
+            history.append({
+                'type': post_type,
+                'ts': datetime.now().isoformat(),
+                'preview': text[:80]
+            })
+            stats['history'] = history[-100:]
+            _save_stats(stats)
+        except Exception as se:
+            logger.warning('stats write error: %s', se)
         return jsonify({'ok': True, 'message_id': data['result']['message_id']})
     except Exception as e:
         logger.error('api_publish: %s', e, exc_info=True)
@@ -800,6 +818,171 @@ def api_settings():
     except Exception as e:
         logger.error('api_settings: %s', e)
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ── Stats / Billing / Models endpoints ────────────────────────────────────────
+
+STATS_FILE   = '/opt/ai-news-agent/data/stats.json'
+BILLING_FILE = '/opt/ai-news-agent/data/billing.json'
+
+def _load_stats() -> dict:
+    try:
+        if os.path.exists(STATS_FILE):
+            with open(STATS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {'posts_published': 0, 'articles_read': 0, 'digests_published': 0, 'history': []}
+
+def _save_stats(data: dict):
+    os.makedirs(os.path.dirname(STATS_FILE), exist_ok=True)
+    with open(STATS_FILE, 'w') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def _load_billing() -> dict:
+    try:
+        if os.path.exists(BILLING_FILE):
+            with open(BILLING_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {'tokens_used': 0, 'requests_count': 0, 'cost_usd': 0.0, 'monthly': []}
+
+def _save_billing(data: dict):
+    os.makedirs(os.path.dirname(BILLING_FILE), exist_ok=True)
+    with open(BILLING_FILE, 'w') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+@app.route('/api/stats')
+@login_required
+def api_stats():
+    """Статистика канала и приложения."""
+    try:
+        bot_token = BOT_TOKEN
+        channel_id = os.getenv('CHANNEL_ID', '@ai_is_you')
+        # Подписчики через Telegram API
+        subscribers = 0
+        channel_title = ''
+        channel_username = ''
+        try:
+            r = requests.get(
+                f'https://api.telegram.org/bot{bot_token}/getChatMemberCount',
+                params={'chat_id': channel_id}, timeout=8
+            )
+            if r.ok and r.json().get('ok'):
+                subscribers = r.json()['result']
+        except Exception as e:
+            logger.warning('getChatMemberCount: %s', e)
+        try:
+            r2 = requests.get(
+                f'https://api.telegram.org/bot{bot_token}/getChat',
+                params={'chat_id': channel_id}, timeout=8
+            )
+            if r2.ok and r2.json().get('ok'):
+                ch = r2.json()['result']
+                channel_title    = ch.get('title', '')
+                channel_username = ch.get('username', '')
+        except Exception as e:
+            logger.warning('getChat: %s', e)
+        # Внутренняя статистика
+        stats = _load_stats()
+        return jsonify({
+            'ok': True,
+            'subscribers': subscribers,
+            'channel_title': channel_title,
+            'channel_username': channel_username,
+            'posts_published': stats.get('posts_published', 0),
+            'digests_published': stats.get('digests_published', 0),
+            'articles_read': stats.get('articles_read', 0),
+            'history': stats.get('history', [])[-20:],  # последние 20 событий
+        })
+    except Exception as e:
+        logger.error('api_stats: %s', e)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/billing')
+@login_required
+def api_billing():
+    """Биллинг — использование токенов и стоимость."""
+    try:
+        billing = _load_billing()
+        # Текущая модель
+        current_model = os.getenv('LLM_MODEL', 'gpt-4.1-mini')
+        current_provider = os.getenv('LLM_PROVIDER', 'openai')
+        # Цены на токены (per 1M tokens, USD)
+        PRICES = {
+            'gpt-4.1-mini':   {'input': 0.40, 'output': 1.60},
+            'gpt-4.1':        {'input': 2.00, 'output': 8.00},
+            'gpt-4.1-nano':   {'input': 0.10, 'output': 0.40},
+            'gemini-2.5-flash': {'input': 0.15, 'output': 0.60},
+            'GigaChat':       {'input': 0.20, 'output': 0.80},
+            'GigaChat-2-Max': {'input': 0.50, 'output': 2.00},
+            'Qwen/Qwen3-235B-A22B-Instruct': {'input': 0.30, 'output': 1.20},
+        }
+        price_info = PRICES.get(current_model, {'input': 0.0, 'output': 0.0})
+        return jsonify({
+            'ok': True,
+            'current_model': current_model,
+            'current_provider': current_provider,
+            'tokens_used': billing.get('tokens_used', 0),
+            'requests_count': billing.get('requests_count', 0),
+            'cost_usd': round(billing.get('cost_usd', 0.0), 4),
+            'monthly': billing.get('monthly', [])[-6:],
+            'price_per_1m_input': price_info['input'],
+            'price_per_1m_output': price_info['output'],
+        })
+    except Exception as e:
+        logger.error('api_billing: %s', e)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/models')
+@login_required
+def api_models():
+    """Список доступных LLM провайдеров и моделей."""
+    models = [
+        {
+            'provider': 'openai',
+            'provider_label': 'OpenAI',
+            'models': [
+                {'id': 'gpt-4.1-mini',  'label': 'GPT-4.1 Mini',  'context': '1M', 'note': 'Быстрый, экономичный'},
+                {'id': 'gpt-4.1',       'label': 'GPT-4.1',       'context': '1M', 'note': 'Лучшее качество'},
+                {'id': 'gpt-4.1-nano',  'label': 'GPT-4.1 Nano',  'context': '1M', 'note': 'Самый быстрый'},
+            ]
+        },
+        {
+            'provider': 'google',
+            'provider_label': 'Google',
+            'models': [
+                {'id': 'gemini-2.5-flash', 'label': 'Gemini 2.5 Flash', 'context': '1M', 'note': 'Быстрый, мультимодальный'},
+            ]
+        },
+        {
+            'provider': 'cloudru',
+            'provider_label': 'Cloud.ru Foundation Models',
+            'models': [
+                {'id': 'GigaChat',                          'label': 'GigaChat',                   'context': '32K', 'note': 'Русскоязычная модель'},
+                {'id': 'GigaChat-2-Max',                    'label': 'GigaChat-2 Max',              'context': '128K', 'note': 'Расширенный контекст'},
+                {'id': 'Qwen/Qwen3-235B-A22B-Instruct',     'label': 'Qwen3 235B',                 'context': '128K', 'note': 'Мощная open-source'},
+                {'id': 'Qwen/Qwen3-Coder-480B-A35B-Instruct','label': 'Qwen3 Coder 480B',          'context': '128K', 'note': 'Специализация на коде'},
+                {'id': 'meta-llama/Llama-4-Scout-17B-16E-Instruct', 'label': 'Llama 4 Scout 17B', 'context': '128K', 'note': 'Meta, быстрый'},
+                {'id': 'deepseek-ai/DeepSeek-R1',           'label': 'DeepSeek R1',                'context': '64K',  'note': 'Рассуждения (reasoning)'},
+            ]
+        },
+        {
+            'provider': 'openrouter',
+            'provider_label': 'OpenRouter',
+            'models': [
+                {'id': 'anthropic/claude-3-haiku',          'label': 'Claude 3 Haiku',             'context': '200K', 'note': 'Fallback, быстрый'},
+                {'id': 'anthropic/claude-sonnet-4-5',       'label': 'Claude Sonnet 4.5',          'context': '200K', 'note': 'Высокое качество'},
+            ]
+        },
+    ]
+    current_model    = os.getenv('LLM_MODEL', 'gpt-4.1-mini')
+    current_provider = os.getenv('LLM_PROVIDER', 'openai')
+    return jsonify({'ok': True, 'models': models, 'current_model': current_model, 'current_provider': current_provider})
 
 
 @app.route('/health')
