@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>YDA News</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green:    #29BA74;
+    --green-d:  #1e9a5e;
+    --green-bg: rgba(41,186,116,0.10);
+    --bg:       var(--tg-theme-bg-color, #0f0f0f);
+    --bg2:      var(--tg-theme-secondary-bg-color, #1a1a1a);
+    --text:     var(--tg-theme-text-color, #ffffff);
+    --hint:     var(--tg-theme-hint-color, #8a8a8a);
+    --border:   rgba(255,255,255,0.08);
+    --radius:   14px;
+    --nav-h:    56px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Geist', system-ui, sans-serif; font-size: 15px; line-height: 1.5; overflow: hidden; }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+  #content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+  /* ── Bottom Nav ── */
+  #nav {
+    display: flex; align-items: center;
+    height: var(--nav-h);
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    flex-shrink: 0;
+  }
+  .nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 6px 0; cursor: pointer; color: var(--hint);
+    transition: color 0.2s; touch-action: manipulation; min-height: 44px;
+  }
+  .nav-btn.active { color: var(--green); }
+  .nav-btn svg { width: 22px; height: 22px; }
+  .nav-btn span { font-size: 10px; font-weight: 500; letter-spacing: 0.3px; text-transform: uppercase; }
+
+  /* ── Tab panels ── */
+  .tab { display: none; padding: 0 0 16px; min-height: 100%; }
+  .tab.active { display: block; }
+
+  /* ── Page header ── */
+  .page-header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 10px;
+  }
+  .page-header h1 { font-size: 17px; font-weight: 600; }
+  .page-header .sub { font-size: 12px; color: var(--hint); margin-top: 2px; }
+
+  /* ── Search ── */
+  .search-wrap { padding: 10px 16px 6px; }
+  .search-input {
+    width: 100%; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 14px; color: var(--text);
+    font-family: inherit; font-size: 14px; outline: none;
+  }
+  .search-input::placeholder { color: var(--hint); }
+
+  /* ── Filter chips ── */
+  .chips { display: flex; gap: 8px; padding: 6px 16px 10px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0; padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--hint); font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+  }
+  .chip.active { background: var(--green); border-color: var(--green); color: #fff; }
+
+  /* ── News list ── */
+  .news-meta { padding: 4px 16px 8px; font-size: 12px; color: var(--hint); display: flex; align-items: center; justify-content: space-between; }
+  .refresh-btn { color: var(--green); font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 4px; touch-action: manipulation; }
+  .refresh-btn svg { width: 13px; height: 13px; }
+
+  .news-list { padding: 0 12px; display: flex; flex-direction: column; gap: 10px; }
+  .news-card {
+    background: var(--bg2); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 12px 14px;
+    cursor: pointer; transition: border-color 0.15s;
+    position: relative;
+  }
+  .news-card.selected { border-color: var(--green); background: rgba(41,186,116,0.06); }
+  .news-card-top { display: flex; align-items: flex-start; gap: 10px; }
+  .news-check {
+    width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--border);
+    flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .news-card.selected .news-check { background: var(--green); border-color: var(--green); }
+  .news-check svg { width: 12px; height: 12px; opacity: 0; transition: opacity 0.15s; }
+  .news-card.selected .news-check svg { opacity: 1; }
+  .news-card-body { flex: 1; min-width: 0; }
+  .news-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 6px; }
+  .news-tag {
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+    letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .tag-source { background: rgba(255,255,255,0.08); color: var(--hint); }
+  .tag-cat { background: var(--green-bg); color: var(--green); }
+  .tag-ru { background: rgba(41,186,116,0.15); color: var(--green); }
+  .news-time { font-size: 11px; color: var(--hint); margin-left: auto; flex-shrink: 0; }
+  .news-title { font-size: 14px; font-weight: 600; line-height: 1.35; margin-bottom: 5px; }
+  .news-summary { font-size: 13px; color: var(--hint); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .news-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .news-read { color: var(--green); font-size: 12px; font-weight: 500; }
+  .news-orig { font-size: 11px; color: var(--hint); }
+
+  /* ── Selection bar ── */
+  #sel-bar {
+    position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+    left: 0; right: 0; z-index: 20;
+    background: var(--bg2); border-top: 1px solid var(--border);
+    padding: 10px 16px; display: none; align-items: center; gap: 10px;
+    animation: slideUp 0.2s ease;
+  }
+  #sel-bar.visible { display: flex; }
+  #sel-count { font-size: 13px; color: var(--hint); flex: 1; }
+  .sel-btn {
+    padding: 8px 16px; border-radius: 10px; font-family: inherit; font-size: 13px;
+    font-weight: 600; cursor: pointer; border: none; touch-action: manipulation;
+  }
+  .sel-btn-post { background: var(--green); color: #fff; }
+  .sel-btn-digest { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+  .sel-btn-clear { background: transparent; color: var(--hint); padding: 8px; }
+
+  /* ── Generate tab ── */
+  .gen-section { padding: 16px; }
+  .gen-section-title { font-size: 11px; font-weight: 600; color: var(--hint); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 10px; }
+  .gen-cards { display: flex; flex-direction: column; gap: 10px; }
+  .gen-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; cursor: pointer; display: flex; align-items: center; gap: 14px;
+    transition: border-color 0.15s; touch-action: manipulation;
+  }
+  .gen-card:active { border-color: var(--green); }
+  .gen-icon {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--green-bg);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .gen-icon svg { width: 22px; height: 22px; color: var(--green); }
+  .gen-card-text h3 { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+  .gen-card-text p { font-size: 13px; color: var(--hint); line-height: 1.35; }
+  .gen-arrow { margin-left: auto; color: var(--hint); flex-shrink: 0; }
+  .gen-arrow svg { width: 16px; height: 16px; }
+
+  /* ── Progress bar ── */
+  #gen-progress { padding: 16px; display: none; }
+  #gen-progress.visible { display: block; }
+  .progress-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 2px; width: 0%; transition: width 0.4s ease; }
+  .progress-steps { display: flex; flex-direction: column; gap: 10px; }
+  .progress-step { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--hint); }
+  .progress-step.active { color: var(--text); }
+  .progress-step.done { color: var(--green); }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .progress-step.active .step-dot { background: var(--green); animation: pulse 1s infinite; }
+  .progress-step.done .step-dot { background: var(--green); }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
+
+  /* ── Result card ── */
+  #gen-result { padding: 16px; display: none; }
+  #gen-result.visible { display: block; }
+  .result-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .result-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .result-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .result-section-title { font-size: 11px; font-weight: 600; color: var(--hint); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
+  .platform-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+  .platform-tab {
+    flex: 1; padding: 9px; border-radius: 10px; border: 1px solid var(--border);
+    background: transparent; color: var(--hint); font-family: inherit; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+  }
+  .platform-tab.active { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn-publish {
+    width: 100%; padding: 13px; border-radius: 12px; background: var(--green);
+    color: #fff; font-family: inherit; font-size: 15px; font-weight: 600;
+    border: none; cursor: pointer; touch-action: manipulation;
+  }
+  .btn-publish:disabled { opacity: 0.5; }
+  .btn-discard {
+    width: 100%; padding: 11px; border-radius: 12px; background: transparent;
+    border: 1px solid var(--border); color: #ff4d4d; font-family: inherit;
+    font-size: 14px; font-weight: 500; cursor: pointer; touch-action: manipulation;
+  }
+  .li-status { font-size: 12px; color: var(--hint); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .li-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hint); flex-shrink: 0; }
+  .li-dot.connected { background: var(--green); }
+  .li-connect { color: var(--green); font-size: 12px; font-weight: 500; cursor: pointer; }
+
+  /* ── Settings tab ── */
+  .settings-section { padding: 16px; }
+  .settings-group { margin-bottom: 20px; }
+  .settings-group-title { font-size: 11px; font-weight: 600; color: var(--hint); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 10px; }
+  .settings-row {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .settings-item {
+    display: flex; align-items: center; padding: 13px 14px; gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-item:last-child { border-bottom: none; }
+  .settings-item-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--green-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .settings-item-icon svg { width: 16px; height: 16px; color: var(--green); }
+  .settings-item-body { flex: 1; min-width: 0; }
+  .settings-item-label { font-size: 14px; font-weight: 500; }
+  .settings-item-value { font-size: 12px; color: var(--hint); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-item-arrow { color: var(--hint); flex-shrink: 0; }
+  .settings-item-arrow svg { width: 14px; height: 14px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.7);
+    display: flex; align-items: flex-end; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.visible { opacity: 1; pointer-events: all; }
+  .modal {
+    width: 100%; background: var(--bg2); border-radius: 20px 20px 0 0;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(100%); transition: transform 0.25s ease;
+  }
+  .modal-overlay.visible .modal { transform: translateY(0); }
+  .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+  .modal-label { font-size: 12px; color: var(--hint); margin-bottom: 6px; font-weight: 500; }
+  .modal-input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 11px 14px; color: var(--text); font-family: inherit; font-size: 14px;
+    outline: none; margin-bottom: 14px;
+  }
+  .modal-input:focus { border-color: var(--green); }
+  .modal-select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 11px 14px; color: var(--text); font-family: inherit; font-size: 14px;
+    outline: none; margin-bottom: 14px; appearance: none;
+  }
+  .modal-btn {
+    width: 100%; padding: 13px; border-radius: 12px; background: var(--green);
+    color: #fff; font-family: inherit; font-size: 15px; font-weight: 600;
+    border: none; cursor: pointer; touch-action: manipulation;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px));
+    left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 18px; font-size: 13px; font-weight: 500;
+    opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; z-index: 200;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error { border-color: #ff4d4d; color: #ff4d4d; }
+
+  /* ── Loading ── */
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-wrap { display: flex; align-items: center; justify-content: center; padding: 40px; gap: 12px; color: var(--hint); font-size: 14px; }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 48px 24px; color: var(--hint); }
+  .empty svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.3; }
+  .empty p { font-size: 14px; }
+
+  /* ── Animations ── */
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.25s ease; }
+
+  /* ── Main tab ── */
+  .main-hero { padding: 20px 16px 16px; }
+  .main-logo { width: 52px; height: 52px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .main-logo span { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+  .main-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .main-sub { font-size: 14px; color: var(--hint); }
+  .main-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 16px; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--green); }
+  .stat-label { font-size: 12px; color: var(--hint); margin-top: 2px; }
+  .main-section { padding: 0 16px 16px; }
+  .main-section-title { font-size: 11px; font-weight: 600; color: var(--hint); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 10px; }
+  .quick-action {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+    cursor: pointer; margin-bottom: 8px; touch-action: manipulation;
+  }
+  .quick-action:active { border-color: var(--green); }
+  .qa-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .qa-icon svg { width: 18px; height: 18px; color: var(--green); }
+  .qa-text h4 { font-size: 14px; font-weight: 600; }
+  .qa-text p { font-size: 12px; color: var(--hint); }
+  .qa-arrow { margin-left: auto; color: var(--hint); }
+  .qa-arrow svg { width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Content area -->
+  <div id="content">
+
+    <!-- ── NEWS TAB ── -->
+    <div id="tab-news" class="tab active">
+      <div class="page-header">
+        <h1>AI News</h1>
+        <div class="sub" id="news-sub">Loading...</div>
+      </div>
+      <div class="search-wrap">
+        <input class="search-input" type="search" id="search-input" placeholder="Search articles..." autocomplete="off">
+      </div>
+      <div class="chips" id="chips">
+        <button class="chip active" data-cat="all">All</button>
+      </div>
+      <div class="news-meta">
+        <span id="news-count"></span>
+        <button class="refresh-btn" id="refresh-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div class="news-list" id="news-list">
+        <div class="loading-wrap"><div class="spinner"></div><span>Loading news...</span></div>
+      </div>
+    </div>
+
+    <!-- ── GENERATE TAB ── -->
+    <div id="tab-generate" class="tab">
+      <div class="page-header">
+        <h1>Generate</h1>
+        <div class="sub">Create posts and digests</div>
+      </div>
+
+      <!-- Progress -->
+      <div id="gen-progress">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-steps" id="progress-steps"></div>
+      </div>
+
+      <!-- Result -->
+      <div id="gen-result">
+        <div class="result-card">
+          <div class="result-text" id="result-text"></div>
+        </div>
+        <div class="result-actions">
+          <div>
+            <div class="result-section-title">Publish to</div>
+            <div class="platform-tabs">
+              <button class="platform-tab active" data-platform="telegram">Telegram</button>
+              <button class="platform-tab" data-platform="linkedin">LinkedIn</button>
+              <button class="platform-tab" data-platform="both">Both</button>
+            </div>
+            <div class="li-status" id="li-status" style="display:none">
+              <div class="li-dot" id="li-dot"></div>
+              <span id="li-status-text">Not connected</span>
+              <span class="li-connect" id="li-connect-btn"></span>
+            </div>
+          </div>
+          <button class="btn-publish" id="btn-publish">Publish</button>
+          <button class="btn-discard" id="btn-discard">Discard</button>
+        </div>
+      </div>
+
+      <!-- Gen buttons -->
+      <div id="gen-buttons">
+        <div class="gen-section">
+          <div class="gen-section-title">Create content</div>
+          <div class="gen-cards">
+            <div class="gen-card" id="btn-write-post">
+              <div class="gen-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </div>
+              <div class="gen-card-text">
+                <h3>Write Post</h3>
+                <p>AI-generated post from latest news</p>
+              </div>
+              <div class="gen-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+            <div class="gen-card" id="btn-build-digest">
+              <div class="gen-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/></svg>
+              </div>
+              <div class="gen-card-text">
+                <h3>Build Digest</h3>
+                <p>Weekly digest of top AI stories</p>
+              </div>
+              <div class="gen-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="gen-section" id="selected-hint" style="display:none">
+          <div style="background:var(--green-bg);border:1px solid var(--green);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--green);">
+            <span id="selected-hint-text"></span> selected from News — use Post or Digest above
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MAIN TAB ── -->
+    <div id="tab-main" class="tab">
+      <div class="main-hero">
+        <div class="main-logo"><span>YDA</span></div>
+        <div class="main-title">YDA News</div>
+        <div class="main-sub">Your AI news assistant</div>
+      </div>
+      <div class="main-stats">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-articles">—</div>
+          <div class="stat-label">Articles today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-posts">—</div>
+          <div class="stat-label">Posts published</div>
+        </div>
+      </div>
+      <div class="main-section">
+        <div class="main-section-title">Quick actions</div>
+        <div class="quick-action" onclick="showTab('news')">
+          <div class="qa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/></svg></div>
+          <div class="qa-text"><h4>Read News</h4><p>Browse latest AI articles</p></div>
+          <div class="qa-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+        <div class="quick-action" onclick="showTab('generate')">
+          <div class="qa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+          <div class="qa-text"><h4>Generate Post</h4><p>Create AI-powered content</p></div>
+          <div class="qa-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+        <div class="quick-action" onclick="showTab('settings')">
+          <div class="qa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+          <div class="qa-text"><h4>Settings</h4><p>API keys and preferences</p></div>
+          <div class="qa-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS TAB ── -->
+    <div id="tab-settings" class="tab">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <div class="sub">API keys and integrations</div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-group">
+          <div class="settings-group-title">LLM Provider</div>
+          <div class="settings-row">
+            <div class="settings-item" onclick="openModal('modal-llm')">
+              <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+              <div class="settings-item-body">
+                <div class="settings-item-label">LLM Model</div>
+                <div class="settings-item-value" id="setting-model-val">gpt-4.1-mini</div>
+              </div>
+              <div class="settings-item-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+            <div class="settings-item" onclick="openModal('modal-apikey')">
+              <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+              <div class="settings-item-body">
+                <div class="settings-item-label">API Key</div>
+                <div class="settings-item-value" id="setting-apikey-val">sk-••••••••••••</div>
+              </div>
+              <div class="settings-item-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Telegram</div>
+          <div class="settings-row">
+            <div class="settings-item" onclick="openModal('modal-channel')">
+              <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg></div>
+              <div class="settings-item-body">
+                <div class="settings-item-label">Channel</div>
+                <div class="settings-item-value" id="setting-channel-val">@ai_is_you</div>
+              </div>
+              <div class="settings-item-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">LinkedIn</div>
+          <div class="settings-row">
+            <div class="settings-item" id="li-settings-item">
+              <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></div>
+              <div class="settings-item-body">
+                <div class="settings-item-label">LinkedIn Account</div>
+                <div class="settings-item-value" id="setting-li-val">Not connected</div>
+              </div>
+              <div class="settings-item-arrow" id="li-settings-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">News Sources</div>
+          <div class="settings-row">
+            <div class="settings-item" onclick="openModal('modal-hours')">
+              <div class="settings-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <div class="settings-item-body">
+                <div class="settings-item-label">Hours back</div>
+                <div class="settings-item-value" id="setting-hours-val">24 hours</div>
+              </div>
+              <div class="settings-item-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- ── Bottom Nav ── -->
+  <nav id="nav">
+    <div class="nav-btn active" data-tab="main" onclick="showTab('main')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Main</span>
+    </div>
+    <div class="nav-btn" data-tab="news" onclick="showTab('news')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/></svg>
+      <span>News</span>
+    </div>
+    <div class="nav-btn" data-tab="generate" onclick="showTab('generate')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <span>Generate</span>
+    </div>
+    <div class="nav-btn" data-tab="settings" onclick="showTab('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </nav>
+</div>
+
+<!-- ── Selection bar ── -->
+<div id="sel-bar">
+  <span id="sel-count">0 selected</span>
+  <button class="sel-btn sel-btn-digest" onclick="generateFromSelected('digest')">Digest</button>
+  <button class="sel-btn sel-btn-post" onclick="generateFromSelected('post')">Post</button>
+  <button class="sel-btn sel-btn-clear" onclick="clearSelection()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+</div>
+
+<!-- ── Modals ── -->
+<div class="modal-overlay" id="modal-llm" onclick="closeModal(event,'modal-llm')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">LLM Model</div>
+    <div class="modal-label">Select model</div>
+    <select class="modal-select" id="modal-llm-select">
+      <option value="gpt-4.1-mini">gpt-4.1-mini (fast, cheap)</option>
+      <option value="gpt-4.1-nano">gpt-4.1-nano (fastest)</option>
+      <option value="gpt-4o">gpt-4o (powerful)</option>
+      <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+    </select>
+    <button class="modal-btn" onclick="saveModel()">Save</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-apikey" onclick="closeModal(event,'modal-apikey')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">API Key</div>
+    <div class="modal-label">OpenAI / compatible API key</div>
+    <input class="modal-input" type="password" id="modal-apikey-input" placeholder="sk-...">
+    <button class="modal-btn" onclick="saveApiKey()">Save</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-channel" onclick="closeModal(event,'modal-channel')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Telegram Channel</div>
+    <div class="modal-label">Channel username or ID</div>
+    <input class="modal-input" type="text" id="modal-channel-input" placeholder="@mychannel">
+    <button class="modal-btn" onclick="saveChannel()">Save</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-hours" onclick="closeModal(event,'modal-hours')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">News Hours Back</div>
+    <div class="modal-label">How far back to fetch news</div>
+    <select class="modal-select" id="modal-hours-select">
+      <option value="12">12 hours</option>
+      <option value="24" selected>24 hours</option>
+      <option value="48">48 hours</option>
+      <option value="72">72 hours</option>
+    </select>
+    <button class="modal-btn" onclick="saveHours()">Save</button>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script>
+// ── Telegram WebApp init ──────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.enableClosingConfirmation();
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const API_BASE = 'https://ai.colliecore.com';
+let authCookie = '';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let allNews = [];
+let selectedIds = new Set();
+let currentPlatform = 'telegram';
+let generatedText = '';
+let currentTab = 'main';
+let settings = JSON.parse(localStorage.getItem('yda_settings') || '{}');
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.nav-btn[data-tab="${name}"]`)?.classList.add('active');
+  currentTab = name;
+  document.getElementById('content').scrollTop = 0;
+  if (name === 'news' && allNews.length === 0) loadNews();
+  if (name === 'settings') loadSettings();
+  if (name === 'main') loadMainStats();
+}
+
+// ── News ──────────────────────────────────────────────────────────────────────
+async function loadNews(force = false) {
+  const list = document.getElementById('news-list');
+  const sub = document.getElementById('news-sub');
+  if (!force) {
+    list.innerHTML = '<div class="loading-wrap"><div class="spinner"></div><span>Loading news...</span></div>';
+  }
+  try {
+    const url = API_BASE + '/api/news' + (force ? '?refresh=1' : '');
+    const resp = await fetchWithAuth(url);
+    const data = await resp.json();
+    allNews = data.items || [];
+    const cached = data.cached;
+    const updated = data.updated ? new Date(data.updated * 1000).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'}) : '';
+    sub.textContent = `${allNews.length} articles · ${updated}${cached ? ' · cached' : ''}`;
+    buildChips();
+    renderNews(allNews);
+    updateMainStats();
+  } catch(e) {
+    list.innerHTML = `<div class="empty"><p>Failed to load news</p></div>`;
+  }
+}
+
+function buildChips() {
+  const cats = ['all', ...new Set(allNews.map(n => n.category).filter(Boolean))];
+  const chips = document.getElementById('chips');
+  chips.innerHTML = cats.map(c =>
+    `<button class="chip${c==='all'?' active':''}" data-cat="${c}" onclick="filterNews('${c}')">${c==='all'?'All '+allNews.length:c}</button>`
+  ).join('');
+}
+
+function filterNews(cat) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+  const filtered = cat === 'all' ? allNews : allNews.filter(n => n.category === cat);
+  renderNews(filtered);
+}
+
+function renderNews(items) {
+  const list = document.getElementById('news-list');
+  const count = document.getElementById('news-count');
+  count.textContent = `${items.length} of ${allNews.length} articles`;
+  if (!items.length) {
+    list.innerHTML = '<div class="empty"><p>No articles found</p></div>';
+    return;
+  }
+  list.innerHTML = items.map((n, i) => {
+    const sel = selectedIds.has(n.id);
+    const dt = n.published ? new Date(n.published).toLocaleDateString('ru', {day:'2-digit',month:'2-digit'}) + ' ' + new Date(n.published).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="news-card fade-in${sel?' selected':''}" onclick="toggleSelect(${n.id})">
+      <div class="news-card-top">
+        <div class="news-check"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="news-card-body">
+          <div class="news-tags">
+            ${n.source ? `<span class="news-tag tag-source">${n.source}</span>` : ''}
+            ${n.category ? `<span class="news-tag tag-cat">${n.category}</span>` : ''}
+            ${n.translated ? `<span class="news-tag tag-ru">RU</span>` : ''}
+            <span class="news-time">${dt}</span>
+          </div>
+          <div class="news-title">${n.title || ''}</div>
+          <div class="news-summary">${n.summary || ''}</div>
+          <div class="news-footer">
+            ${n.link ? `<a class="news-read" href="${n.link}" target="_blank" onclick="event.stopPropagation()">Read ↗</a>` : '<span></span>'}
+            ${n.title_orig && n.title_orig !== n.title ? `<span class="news-orig">Original</span>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Selection ─────────────────────────────────────────────────────────────────
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateSelBar();
+  // Update card visual
+  document.querySelectorAll('.news-card').forEach(card => {
+    const idx = allNews.findIndex(n => n.id == id);
+    // re-render just this card
+  });
+  renderNews(getCurrentFilteredNews());
+}
+
+function getCurrentFilteredNews() {
+  const activeChip = document.querySelector('.chip.active');
+  const cat = activeChip?.dataset.cat || 'all';
+  return cat === 'all' ? allNews : allNews.filter(n => n.category === cat);
+}
+
+function updateSelBar() {
+  const bar = document.getElementById('sel-bar');
+  const count = document.getElementById('sel-count');
+  const hint = document.getElementById('selected-hint');
+  const hintText = document.getElementById('selected-hint-text');
+  if (selectedIds.size > 0) {
+    bar.classList.add('visible');
+    count.textContent = `${selectedIds.size} selected`;
+    hint.style.display = 'block';
+    hintText.textContent = `${selectedIds.size} article${selectedIds.size>1?'s':''}`;
+  } else {
+    bar.classList.remove('visible');
+    hint.style.display = 'none';
+  }
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  updateSelBar();
+  renderNews(getCurrentFilteredNews());
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  const filtered = allNews.filter(n =>
+    (n.title || '').toLowerCase().includes(q) ||
+    (n.summary || '').toLowerCase().includes(q)
+  );
+  document.getElementById('news-count').textContent = `${filtered.length} of ${allNews.length} articles`;
+  document.getElementById('news-list').innerHTML = filtered.length
+    ? filtered.map((n) => {
+        const sel = selectedIds.has(n.id);
+        const dt = n.published ? new Date(n.published).toLocaleDateString('ru',{day:'2-digit',month:'2-digit'})+' '+new Date(n.published).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
+        return `<div class="news-card fade-in${sel?' selected':''}" onclick="toggleSelect(${n.id})">
+          <div class="news-card-top">
+            <div class="news-check"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="news-card-body">
+              <div class="news-tags">
+                ${n.source?`<span class="news-tag tag-source">${n.source}`:''}
+                ${n.category?`<span class="news-tag tag-cat">${n.category}</span>`:''}
+                <span class="news-time">${dt}</span>
+              </div>
+              <div class="news-title">${n.title||''}</div>
+              <div class="news-summary">${n.summary||''}</div>
+              <div class="news-footer">${n.link?`<a class="news-read" href="${n.link}" target="_blank" onclick="event.stopPropagation()">Read ↗</a>`:'<span></span>'}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty"><p>No results</p></div>';
+});
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+document.getElementById('refresh-btn').addEventListener('click', () => loadNews(true));
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+const STEPS_POST = ['Fetching latest news', 'Selecting top stories', 'Writing post', 'Finalizing'];
+const STEPS_DIGEST = ['Fetching latest news', 'Analyzing stories', 'Structuring digest', 'Writing content', 'Finalizing'];
+
+function showProgress(steps) {
+  document.getElementById('gen-buttons').style.display = 'none';
+  document.getElementById('gen-result').classList.remove('visible');
+  const prog = document.getElementById('gen-progress');
+  prog.classList.add('visible');
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-steps').innerHTML = steps.map((s, i) =>
+    `<div class="progress-step" id="step-${i}"><div class="step-dot"></div><span>${s}</span></div>`
+  ).join('');
+}
+
+function advanceProgress(stepIndex, steps) {
+  const pct = Math.round(((stepIndex + 1) / steps.length) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  for (let i = 0; i < steps.length; i++) {
+    const el = document.getElementById('step-' + i);
+    if (!el) continue;
+    el.className = 'progress-step' + (i < stepIndex ? ' done' : i === stepIndex ? ' active' : '');
+  }
+}
+
+async function doGenerate(type, selectedArticleIds) {
+  showTab('generate');
+  const steps = type === 'digest' ? STEPS_DIGEST : STEPS_POST;
+  showProgress(steps);
+
+  let stepIdx = 0;
+  advanceProgress(0, steps);
+  const timer = setInterval(() => {
+    stepIdx = Math.min(stepIdx + 1, steps.length - 2);
+    advanceProgress(stepIdx, steps);
+  }, 2000);
+
+  try {
+    const body = {};
+    if (selectedArticleIds && selectedArticleIds.length) body.selected_ids = selectedArticleIds;
+    const resp = await fetchWithAuth(API_BASE + '/api/generate?type=' + type, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    clearInterval(timer);
+    advanceProgress(steps.length - 1, steps);
+    await new Promise(r => setTimeout(r, 400));
+
+    if (data.ok && data.text) {
+      generatedText = data.text;
+      document.getElementById('gen-progress').classList.remove('visible');
+      document.getElementById('result-text').textContent = data.text;
+      document.getElementById('gen-result').classList.add('visible');
+      loadLinkedInStatus();
+      clearSelection();
+    } else {
+      throw new Error(data.error || 'Generation failed');
+    }
+  } catch(e) {
+    clearInterval(timer);
+    document.getElementById('gen-progress').classList.remove('visible');
+    document.getElementById('gen-buttons').style.display = '';
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+function generateFromSelected(type) {
+  const ids = [...selectedIds];
+  doGenerate(type, ids);
+}
+
+document.getElementById('btn-write-post').addEventListener('click', () => doGenerate('post', []));
+document.getElementById('btn-build-digest').addEventListener('click', () => doGenerate('digest', []));
+
+// ── Platform tabs ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.platform-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.platform-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPlatform = btn.dataset.platform;
+    const liStatus = document.getElementById('li-status');
+    liStatus.style.display = (currentPlatform === 'linkedin' || currentPlatform === 'both') ? 'flex' : 'none';
+    updatePublishBtn();
+  });
+});
+
+function updatePublishBtn() {
+  const btn = document.getElementById('btn-publish');
+  const labels = {telegram: 'Publish to Telegram', linkedin: 'Publish to LinkedIn', both: 'Publish to Both'};
+  btn.textContent = labels[currentPlatform] || 'Publish';
+}
+
+// ── LinkedIn status ───────────────────────────────────────────────────────────
+async function loadLinkedInStatus() {
+  try {
+    const resp = await fetchWithAuth(API_BASE + '/api/linkedin/status');
+    const data = await resp.json();
+    const dot = document.getElementById('li-dot');
+    const text = document.getElementById('li-status-text');
+    const btn = document.getElementById('li-connect-btn');
+    if (data.connected) {
+      dot.className = 'li-dot connected';
+      text.textContent = 'Connected' + (data.name ? ': ' + data.name : '');
+      btn.textContent = 'Disconnect';
+      btn.onclick = disconnectLinkedIn;
+    } else {
+      dot.className = 'li-dot';
+      text.textContent = 'Not connected';
+      btn.textContent = 'Connect';
+      btn.onclick = connectLinkedIn;
+    }
+  } catch(e) {}
+}
+
+function connectLinkedIn() {
+  window.open(API_BASE + '/linkedin/auth', '_blank');
+  setTimeout(loadLinkedInStatus, 3000);
+}
+
+async function disconnectLinkedIn() {
+  await fetchWithAuth(API_BASE + '/api/linkedin/disconnect', {method:'POST'});
+  loadLinkedInStatus();
+}
+
+// ── Publish ───────────────────────────────────────────────────────────────────
+document.getElementById('btn-publish').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-publish');
+  btn.disabled = true;
+  btn.textContent = 'Publishing...';
+  try {
+    if (currentPlatform === 'telegram' || currentPlatform === 'both') {
+      const r = await fetchWithAuth(API_BASE + '/api/publish', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: generatedText})
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error('Telegram: ' + d.error);
+    }
+    if (currentPlatform === 'linkedin' || currentPlatform === 'both') {
+      const r = await fetchWithAuth(API_BASE + '/api/publish_linkedin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: generatedText})
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error('LinkedIn: ' + d.error);
+    }
+    showToast('Published successfully', 'success');
+    discardContent();
+    // Update stats
+    const posts = parseInt(localStorage.getItem('yda_posts') || '0') + 1;
+    localStorage.setItem('yda_posts', posts);
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false;
+    updatePublishBtn();
+  }
+});
+
+document.getElementById('btn-discard').addEventListener('click', discardContent);
+
+function discardContent() {
+  generatedText = '';
+  document.getElementById('gen-result').classList.remove('visible');
+  document.getElementById('gen-progress').classList.remove('visible');
+  document.getElementById('gen-buttons').style.display = '';
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function loadSettings() {
+  const s = settings;
+  document.getElementById('setting-model-val').textContent = s.model || 'gpt-4.1-mini';
+  document.getElementById('setting-apikey-val').textContent = s.apikey ? 'sk-••••' + s.apikey.slice(-4) : 'Not set';
+  document.getElementById('setting-channel-val').textContent = s.channel || '@ai_is_you';
+  document.getElementById('setting-hours-val').textContent = (s.hours || 24) + ' hours';
+  // LinkedIn
+  loadLinkedInSettingsStatus();
+}
+
+async function loadLinkedInSettingsStatus() {
+  try {
+    const resp = await fetchWithAuth(API_BASE + '/api/linkedin/status');
+    const data = await resp.json();
+    const val = document.getElementById('setting-li-val');
+    const arrow = document.getElementById('li-settings-arrow');
+    const item = document.getElementById('li-settings-item');
+    if (data.connected) {
+      val.textContent = data.name || 'Connected';
+      val.style.color = 'var(--green)';
+      item.onclick = () => disconnectLinkedInSettings();
+      arrow.innerHTML = '<span style="font-size:12px;color:var(--hint)">Disconnect</span>';
+    } else {
+      val.textContent = 'Not connected';
+      val.style.color = '';
+      item.onclick = connectLinkedIn;
+    }
+  } catch(e) {}
+}
+
+async function disconnectLinkedInSettings() {
+  await fetchWithAuth(API_BASE + '/api/linkedin/disconnect', {method:'POST'});
+  loadLinkedInSettingsStatus();
+  showToast('LinkedIn disconnected', 'success');
+}
+
+function saveModel() {
+  const val = document.getElementById('modal-llm-select').value;
+  settings.model = val;
+  saveSettings();
+  document.getElementById('setting-model-val').textContent = val;
+  closeModalById('modal-llm');
+  // Send to server
+  fetchWithAuth(API_BASE + '/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({model: val})
+  }).catch(() => {});
+  showToast('Model saved', 'success');
+}
+
+function saveApiKey() {
+  const val = document.getElementById('modal-apikey-input').value.trim();
+  if (!val) return;
+  settings.apikey = val;
+  saveSettings();
+  document.getElementById('setting-apikey-val').textContent = 'sk-••••' + val.slice(-4);
+  closeModalById('modal-apikey');
+  fetchWithAuth(API_BASE + '/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({openai_api_key: val})
+  }).catch(() => {});
+  showToast('API key saved', 'success');
+}
+
+function saveChannel() {
+  const val = document.getElementById('modal-channel-input').value.trim();
+  if (!val) return;
+  settings.channel = val;
+  saveSettings();
+  document.getElementById('setting-channel-val').textContent = val;
+  closeModalById('modal-channel');
+  fetchWithAuth(API_BASE + '/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({channel_id: val})
+  }).catch(() => {});
+  showToast('Channel saved', 'success');
+}
+
+function saveHours() {
+  const val = document.getElementById('modal-hours-select').value;
+  settings.hours = parseInt(val);
+  saveSettings();
+  document.getElementById('setting-hours-val').textContent = val + ' hours';
+  closeModalById('modal-hours');
+  showToast('Saved', 'success');
+}
+
+function saveSettings() {
+  localStorage.setItem('yda_settings', JSON.stringify(settings));
+}
+
+// ── Main stats ────────────────────────────────────────────────────────────────
+function loadMainStats() {
+  document.getElementById('stat-articles').textContent = allNews.length || '—';
+  document.getElementById('stat-posts').textContent = localStorage.getItem('yda_posts') || '0';
+}
+
+function updateMainStats() {
+  document.getElementById('stat-articles').textContent = allNews.length;
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(id) {
+  document.getElementById(id).classList.add('visible');
+}
+function closeModal(event, id) {
+  if (event.target === document.getElementById(id)) closeModalById(id);
+}
+function closeModalById(id) {
+  document.getElementById(id).classList.remove('visible');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ── Auth helper ───────────────────────────────────────────────────────────────
+async function fetchWithAuth(url, opts = {}) {
+  // Try with existing session cookie first
+  const resp = await fetch(url, {...opts, credentials: 'include'});
+  if (resp.status === 401) {
+    // Auto-login with stored credentials
+    const loginResp = await fetch(API_BASE + '/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'username=' + encodeURIComponent(settings.username || 'dmayudin') +
+            '&password=' + encodeURIComponent(settings.password || ''),
+      credentials: 'include'
+    });
+    if (loginResp.ok) {
+      return fetch(url, {...opts, credentials: 'include'});
+    }
+  }
+  return resp;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Pre-populate modal inputs from settings
+document.getElementById('modal-channel-input').value = settings.channel || '@ai_is_you';
+document.getElementById('modal-llm-select').value = settings.model || 'gpt-4.1-mini';
+updatePublishBtn();
+</script>
+</body>
+</html>

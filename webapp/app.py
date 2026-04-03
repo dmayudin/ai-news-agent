@@ -761,6 +761,47 @@ def api_publish_linkedin():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+@app.route('/tma')
+def tma():
+    """Telegram Mini App — без сессионной авторизации (Telegram сам валидирует пользователя)."""
+    return send_from_directory('static', 'tma.html')
+
+
+@app.route('/api/settings', methods=['POST'])
+@login_required
+def api_settings():
+    """Update runtime settings (model, api key, channel)."""
+    try:
+        body = request.get_json(force=True)
+        changed = []
+        if 'openai_api_key' in body:
+            new_key = body['openai_api_key'].strip()
+            if new_key:
+                os.environ['OPENAI_API_KEY'] = new_key
+                # Reinitialise agent with new key
+                global agent
+                agent = NewsAgent(
+                    openai_api_key=new_key,
+                    telegram_token=BOT_TOKEN,
+                    user_id=os.getenv('TELEGRAM_USER_ID', ''),
+                )
+                changed.append('openai_api_key')
+        if 'model' in body:
+            new_model = body['model'].strip()
+            if new_model:
+                os.environ['LLM_MODEL'] = new_model
+                changed.append('model')
+        if 'channel_id' in body:
+            new_channel = body['channel_id'].strip()
+            if new_channel:
+                os.environ['CHANNEL_ID'] = new_channel
+                changed.append('channel_id')
+        return jsonify({'ok': True, 'changed': changed})
+    except Exception as e:
+        logger.error('api_settings: %s', e)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 @app.route('/health')
 def health():
     """Публичный health-check — без авторизации."""

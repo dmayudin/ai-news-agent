@@ -108,8 +108,9 @@ def main_kb():
         ],
     ]
     if WEBAPP_URL:
+        tma_url = WEBAPP_URL.rstrip('/') + '/tma'
         buttons.append([
-            {"text": "🌐 Лента новостей", "web_app": {"url": WEBAPP_URL}}
+            {"text": "YDA News App", "web_app": {"url": tma_url}}
         ])
     return {"inline_keyboard": buttons}
 
