@@ -31,7 +31,19 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import requests
+import socket
+import urllib3.util.connection as _urllib3_conn
 from mcp.server.fastmcp import FastMCP
+
+# ── Force IPv4 for all LinkedIn requests ─────────────────────────────
+# WireGuard only routes IPv4 for LinkedIn IPs (108.174.0.0/16).
+# urllib3 by default tries IPv6 first, which times out.
+# Patching allowed_gai_family forces AF_INET globally.
+_urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
+
+def _li_session() -> requests.Session:
+    """Create a requests Session for LinkedIn API calls."""
+    return requests.Session()
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -121,7 +133,7 @@ def _do_refresh_token(t: dict) -> dict:
     if not t.get('refresh_token'):
         raise RuntimeError('No refresh token available. Please reconnect LinkedIn.')
 
-    resp = requests.post(
+    resp = _li_session().post(
         'https://www.linkedin.com/oauth/v2/accessToken',
         data={
             'grant_type':    'refresh_token',
@@ -156,7 +168,7 @@ def _do_refresh_token(t: dict) -> dict:
 
 def _fetch_userinfo(token: str) -> dict:
     """Fetch user profile from /v2/userinfo (OpenID Connect endpoint)."""
-    resp = requests.get(
+    resp = _li_session().get(
         'https://api.linkedin.com/v2/userinfo',
         headers={'Authorization': f'Bearer {token}'},
         timeout=15,
@@ -232,7 +244,7 @@ def linkedin_exchange_code(code: str) -> dict:
 
     try:
         # Exchange code for tokens
-        resp = requests.post(
+        resp = _li_session().post(
             'https://www.linkedin.com/oauth/v2/accessToken',
             data={
                 'grant_type':   'authorization_code',
@@ -375,7 +387,7 @@ def linkedin_publish_post(text: str) -> dict:
             'isReshareDisabledByAuthor': False,
         }
 
-        resp = requests.post(
+        resp = _li_session().post(
             'https://api.linkedin.com/rest/posts',
             headers=_api_headers(token),
             json=payload,

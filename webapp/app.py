@@ -529,21 +529,62 @@ def api_generate():
             now_msk = datetime.now()
         today_str = f"{now_msk.day} {MONTHS_RU[now_msk.month-1]} {now_msk.year}"
 
+        import re
+
+        def _clean_tg(text: str) -> str:
+            """Remove markdown artifacts, keep only HTML tags valid for Telegram."""
+            text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)  # **bold** → <b>bold</b>
+            text = re.sub(r'\*(.+?)\*',     r'\1',        text)  # *italic* → plain
+            text = re.sub(r'#{1,6}\s*',     '',           text)  # ## headings
+            text = re.sub(r'\n{3,}',        '\n\n',       text)  # triple newlines
+            return text.strip()
+
+        def _clean_li(text: str) -> str:
+            """Clean LinkedIn text — plain text only, no HTML tags."""
+            text = re.sub(r'<b>(.+?)</b>', r'\1', text)           # <b> → plain
+            text = re.sub(r'<a href=[^>]+>(.+?)</a>', r'\1', text) # <a> → link text
+            text = re.sub(r'<[^>]+>', '', text)                    # any other tags
+            text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+            text = re.sub(r'\*(.+?)\*',     r'\1', text)
+            text = re.sub(r'#{1,6}\s*',     '',    text)
+            text = re.sub(r'\n{3,}',        '\n\n', text)
+            return text.strip()
+
         if gen_type == 'post':
-            prompt = (
+            # ── Telegram prompt ──────────────────────────────────────────────
+            prompt_tg = (
                 'Ты — редактор Telegram-канала @ai_is_you об искусственном интеллекте.\n'
                 'Напиши один яркий пост на русском языке на основе самой интересной новости из списка ниже.\n'
-                'Стиль: экспертный, живой, без воды. Длина: 150–250 слов.\n'
+                'Стиль: живой, разговорный, с лёгкой иронией, без воды. Длина: 120–200 слов.\n'
                 'Без хэштегов. Без эмодзи.\n'
                 'ВАЖНО: используй ТОЛЬКО теги <b>текст</b> для жирного и <a href="URL">текст</a> для ссылок.\n'
                 'НЕ используй **звёздочки**, *курсив*, markdown-разметку.\n'
                 'В конце поста добавь одну строку: <a href="ССЫЛКА">→ источник</a>\n\n'
                 'Новости:\n' + news_block
             )
-        else:
-            n_items = len(formatted_items)
+            # ── LinkedIn prompt ───────────────────────────────────────────────
+            prompt_li = (
+                'Ты — эксперт по AI, пишешь профессиональный пост для LinkedIn на русском языке.\n'
+                'Выбери самую значимую новость из списка ниже и напиши пост в деловом стиле.\n'
+                '\n'
+                'Требования к формату LinkedIn:\n'
+                '  - Начни с сильного первого предложения-хука (без приветствий).\n'
+                '  - Структура: факт/новость → почему это важно для индустрии → вывод или вопрос.\n'
+                '  - Длина: 150–250 слов.\n'
+                '  - Стиль: профессиональный, аналитический, без разговорных оборотов.\n'
+                '  - Без эмодзи. Без хэштегов. Без HTML-тегов.\n'
+                '  - Только чистый текст с абзацами.\n'
+                '  - В конце добавь строку: Источник: НАЗВАНИЕ_ИСТОЧНИКА (URL)\n\n'
+                'Новости:\n' + news_block
+            )
+            max_tok_tg = 800
+            max_tok_li = 800
+
+        else:  # digest
+            n_items  = len(formatted_items)
             n_points = min(max(n_items, 3), 12)
-            prompt = (
+            # ── Telegram digest prompt ────────────────────────────────────────
+            prompt_tg = (
                 f'Ты — редактор Telegram-канала @ai_is_you об искусственном интеллекте.\n'
                 f'Составь дайджест AI-новостей за {today_str} на русском языке.\n'
                 f'\n'
@@ -571,22 +612,46 @@ def api_generate():
                 f'\n'
                 f'Новости:\n' + news_block
             )
+            # ── LinkedIn digest prompt ────────────────────────────────────────
+            prompt_li = (
+                f'Ты — AI-аналитик, пишешь еженедельный дайджест для LinkedIn на русском языке.\n'
+                f'Составь профессиональный обзор AI-новостей за {today_str}.\n'
+                f'\n'
+                f'Требования к формату LinkedIn-дайджеста:\n'
+                f'  - Заголовок: «AI-дайджест: {today_str}» (первая строка, без тегов).\n'
+                f'  - Для каждой новости: ЗАГОЛОВОК ЗАГЛАВНЫМИ → абзац 2–3 предложения → Источник: НАЗВАНИЕ (URL).\n'
+                f'  - {n_points} новостей.\n'
+                f'  - Стиль: деловой, аналитический, без разговорных оборотов.\n'
+                f'  - Без эмодзи. Без хэштегов. Без HTML-тегов. Только чистый текст.\n'
+                f'  - Заголовок каждой новости = суть, а НЕ название источника.\n'
+                f'\n'
+                f'Новости:\n' + news_block
+            )
+            max_tok_tg = 3000
+            max_tok_li = 3000
 
-        max_tok = 3000 if gen_type == 'digest' else 800
-        content = chat_complete(
-            [{"role": "user", "content": prompt}],
+        # Генерируем оба варианта
+        content_tg = chat_complete(
+            [{"role": "user", "content": prompt_tg}],
             temperature=0.7,
-            max_tokens=max_tok,
+            max_tokens=max_tok_tg,
+        )
+        content_li = chat_complete(
+            [{"role": "user", "content": prompt_li}],
+            temperature=0.6,
+            max_tokens=max_tok_li,
         )
 
-        # Постобработка: убираем markdown-артефакты которые GPT может добавить вопреки инструкции
-        import re
-        content = re.sub(r'\*\*(.+?)\*\*', r'\1', content)   # **жирный** → жирный
-        content = re.sub(r'\*(.+?)\*',     r'\1', content)   # *курсив* → текст
-        content = re.sub(r'#{1,6}\s*',     '',    content)   # ## заголовки
-        content = re.sub(r'\n{3,}',        '\n\n', content)  # тройные переносы
+        content_tg = _clean_tg(content_tg)
+        content_li = _clean_li(content_li)
 
-        return jsonify({'ok': True, 'content': content, 'type': gen_type})
+        return jsonify({
+            'ok': True,
+            'content': content_tg,          # backward compat — Telegram version
+            'content_tg': content_tg,
+            'content_li': content_li,
+            'type': gen_type,
+        })
     except Exception as e:
         logger.error('api_generate: %s', e, exc_info=True)
         return jsonify({'ok': False, 'error': str(e)}), 500

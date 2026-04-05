@@ -503,6 +503,31 @@ input { font-family: var(--font) }
 
 /* ── PLATFORM SELECTOR ── */
 .platform-tabs { display: flex; gap: 6px; margin-bottom: 12px }
+
+/* ── CONTENT FORMAT TABS (TG / LI) ── */
+.content-format-tabs {
+  display: flex; gap: 0; margin-bottom: 14px;
+  border: 1px solid var(--border2); border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.content-format-tab {
+  flex: 1; padding: 8px 0; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--muted2); transition: all 0.18s;
+}
+.content-format-tab:first-child { border-right: 1px solid var(--border2) }
+.content-format-tab.active {
+  background: var(--accent); color: #fff;
+}
+.content-format-tab:not(.active):hover { background: var(--surface2); color: var(--text) }
+
+/* LinkedIn textarea — plain text, monospace feel */
+.action-content-li {
+  font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace) !important;
+  font-size: 13px !important; line-height: 1.65 !important;
+  white-space: pre-wrap !important;
+}
 .platform-tab {
   flex: 1; padding: 9px 4px; border-radius: var(--r-sm);
   border: 1px solid var(--border2); background: var(--surface);
@@ -1412,37 +1437,50 @@ input[type="time"] { min-height: 44px }
 
       <!-- Content panel (shown after generation) -->
       <div id="content-panel" style="display:none">
-        <div class="action-panel">
           <div class="action-panel-header">
             <div class="action-panel-title" id="content-panel-title">Post</div>
             <div class="action-panel-badge" id="content-panel-badge">Draft</div>
           </div>
-          <div class="action-panel-sub">Tap the text to edit before publishing</div>
-          <div class="action-content" id="content-text" contenteditable="true" oninput="onContentEdit()"></div>
-          <div class="divider"></div>
-          <div class="section-label">Publish to</div>
-          <div class="platform-tabs">
-            <button class="platform-tab active" id="tab-tg" onclick="setPlatform('telegram')">Telegram</button>
-            <button class="platform-tab" id="tab-li" onclick="setPlatform('linkedin')">LinkedIn</button>
-            <button class="platform-tab" id="tab-both" onclick="setPlatform('both')">Both</button>
+
+          <!-- ── CONTENT TABS: TG / LI ── -->
+          <div class="content-format-tabs">
+            <button class="content-format-tab active" id="ctab-tg" onclick="switchContentTab('tg')">Telegram</button>
+            <button class="content-format-tab" id="ctab-li" onclick="switchContentTab('li')">LinkedIn</button>
           </div>
-          <div id="li-status-row" class="li-status" style="display:none">
-            <div class="li-status-dot" id="li-dot"></div>
-            <span id="li-status-text">Not connected</span>
-            <button class="li-connect-btn" id="li-connect-btn" onclick="connectLinkedIn()">Connect</button>
+
+          <!-- Telegram block -->
+          <div id="content-block-tg">
+            <div class="action-panel-sub">Tap to edit — HTML-формат Telegram</div>
+            <div class="action-content" id="content-text-tg" contenteditable="true" oninput="onContentEditTg()"></div>
+            <div class="li-status" id="tg-status-row" style="margin-top:8px">
+              <div class="li-status-dot on"></div>
+              <span>Telegram Channel</span>
+            </div>
+            <button class="primary-btn" id="btn-publish-tg" onclick="doPublishTg()" style="margin-top:8px">Publish to Telegram</button>
+            <div class="schedule-row" style="margin-top:8px">
+              <input class="time-input" type="time" id="schedule-time" value="10:00">
+              <button class="secondary-btn" id="btn-schedule" onclick="doSchedule()">Schedule</button>
+            </div>
+            <div id="publish-result-tg" style="display:none"></div>
           </div>
-          <button class="primary-btn" id="btn-publish" onclick="doPublish()">Publish to Channel</button>
-          <div class="schedule-row">
-            <input class="time-input" type="time" id="schedule-time" value="10:00">
-            <button class="secondary-btn" id="btn-schedule" onclick="doSchedule()">Schedule</button>
+
+          <!-- LinkedIn block -->
+          <div id="content-block-li" style="display:none">
+            <div class="action-panel-sub">Tap to edit — чистый текст LinkedIn</div>
+            <div class="action-content action-content-li" id="content-text-li" contenteditable="true" oninput="onContentEditLi()"></div>
+            <div id="li-status-row" class="li-status" style="margin-top:8px">
+              <div class="li-status-dot" id="li-dot"></div>
+              <span id="li-status-text">Not connected</span>
+              <button class="li-connect-btn" id="li-connect-btn" onclick="connectLinkedIn()">Connect</button>
+            </div>
+            <button class="primary-btn" id="btn-publish-li" onclick="doPublishLi()" style="margin-top:8px">Publish to LinkedIn</button>
+            <div id="publish-result-li" style="display:none"></div>
           </div>
+
+          <div class="divider" style="margin-top:12px"></div>
           <button class="danger-btn" onclick="discardContent()">Discard</button>
           <div id="publish-result" style="display:none"></div>
         </div>
-      </div>
-
-    </div>
-  </div>
 
 </div>
 
@@ -1500,6 +1538,18 @@ let generatedContent = '', generatedType = '';
 let selectedIds = new Set();
 let activePlatform = 'telegram';
 let liConnected = false;
+let generatedContentTg = '';  // Telegram version
+let generatedContentLi = '';  // LinkedIn version
+let activeContentTab = 'tg';  // current tab
+
+function switchContentTab(tab) {
+  activeContentTab = tab;
+  document.getElementById('ctab-tg').classList.toggle('active', tab==='tg');
+  document.getElementById('ctab-li').classList.toggle('active', tab==='li');
+  document.getElementById('content-block-tg').style.display = tab==='tg' ? '' : 'none';
+  document.getElementById('content-block-li').style.display = tab==='li' ? '' : 'none';
+  if (tab==='li') checkLinkedInStatus();
+}
 
 // ── LinkedIn ──
 async function checkLinkedInStatus() {
@@ -1979,6 +2029,8 @@ async function generateFromSelected(type) {
   showTab('generate');
   document.getElementById('content-panel').style.display='none';
   document.getElementById('publish-result').style.display='none';
+  document.getElementById('publish-result-tg').style.display='none';
+  document.getElementById('publish-result-li').style.display='none';
   const btn = document.getElementById(type==='post'?'btn-post':'btn-digest');
   if (btn) btn.disabled=true;
   const progressInterval = showProgress(type);
@@ -1987,13 +2039,18 @@ async function generateFromSelected(type) {
     const data=await r.json();
     hideProgress(progressInterval);
     if (!data.ok) throw new Error(data.error||'Error');
-    generatedContent=data.content; generatedType=type;
+    generatedContent=data.content_tg||data.content; generatedType=type;
+    generatedContentTg=data.content_tg||data.content;
+    generatedContentLi=data.content_li||'';
     document.getElementById('content-panel-title').textContent=type==='post'?'Post':'Digest';
     document.getElementById('content-panel-badge').textContent='Draft';
-    document.getElementById('content-text').innerHTML=renderContent(generatedContent);
+    document.getElementById('content-text-tg').innerHTML=renderContent(generatedContentTg);
+    document.getElementById('content-text-li').textContent=generatedContentLi;
+    switchContentTab('tg');
     document.getElementById('gen-buttons').style.display='none';
     document.getElementById('content-panel').style.display='';
-    document.getElementById('btn-publish').disabled=false;
+    document.getElementById('btn-publish-tg').disabled=false;
+    document.getElementById('btn-publish-li').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
   } catch(e) {
     hideProgress(progressInterval);
@@ -2043,22 +2100,32 @@ function hideProgress(interval) {
 // ── Generate (Generate tab buttons) ──
 async function doGenerate(type) {
   const btn=document.getElementById(type==='post'?'btn-post':'btn-digest');
-  const panel=document.getElementById('content-panel'), title=document.getElementById('content-panel-title');
-  const text=document.getElementById('content-text'), pubRes=document.getElementById('publish-result');
+  const panel=document.getElementById('content-panel');
   btn.disabled=true;
-  panel.style.display='none'; pubRes.style.display='none';
+  panel.style.display='none';
+  document.getElementById('publish-result').style.display='none';
+  document.getElementById('publish-result-tg').style.display='none';
+  document.getElementById('publish-result-li').style.display='none';
   const progressInterval = showProgress(type);
   try {
     const r=await fetch('/api/generate?type='+type), data=await r.json();
     hideProgress(progressInterval);
     if (!data.ok) throw new Error(data.error||'Error');
-    generatedContent=data.content; generatedType=type;
-    title.textContent=type==='post'?'Post':'Digest';
+    generatedContent=data.content_tg||data.content; generatedType=type;
+    generatedContentTg=data.content_tg||data.content;
+    generatedContentLi=data.content_li||'';
+    document.getElementById('content-panel-title').textContent=type==='post'?'Post':'Digest';
     document.getElementById('content-panel-badge').textContent='Draft';
-    text.innerHTML=renderContent(generatedContent);
+    // Fill Telegram block
+    document.getElementById('content-text-tg').innerHTML=renderContent(generatedContentTg);
+    // Fill LinkedIn block (plain text)
+    document.getElementById('content-text-li').textContent=generatedContentLi;
+    // Show TG tab by default
+    switchContentTab('tg');
     document.getElementById('gen-buttons').style.display='none';
     panel.style.display='';
-    document.getElementById('btn-publish').disabled=false;
+    document.getElementById('btn-publish-tg').disabled=false;
+    document.getElementById('btn-publish-li').disabled=false;
     document.getElementById('btn-schedule').disabled=false;
   } catch(e) {
     hideProgress(progressInterval);
@@ -2069,16 +2136,76 @@ async function doGenerate(type) {
 }
 
 function onContentEdit() { generatedContent=getEditedText(); }
+function onContentEditTg() {
+  generatedContentTg = getEditedTextFrom('content-text-tg');
+  generatedContent = generatedContentTg;
+}
+function onContentEditLi() {
+  generatedContentLi = document.getElementById('content-text-li').innerText.trim();
+}
 
-function getEditedText() {
-  const el=document.getElementById('content-text');
+function getEditedText() { return getEditedTextFrom('content-text-tg'); }
+function getEditedTextFrom(id) {
+  const el=document.getElementById(id);
+  if (!el) return '';
   let html=el.innerHTML;
   html=html.replace(/<br\s*\/?>/gi,'\n').replace(/<div>/gi,'\n').replace(/<\/div>/gi,'');
   html=html.replace(/<(?!\/?b>|\/?a[ >]|a href)[^>]+>/g,'');
   return html.trim();
 }
 
-// ── Publish ──
+// ── Publish (Telegram) ──
+async function doPublishTg() {
+  const btn=document.getElementById('btn-publish-tg');
+  const res=document.getElementById('publish-result-tg');
+  btn.disabled=true; btn.textContent='Publishing...'; res.style.display='none';
+  const textToSend=getEditedTextFrom('content-text-tg')||generatedContentTg;
+  const checkSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>`;
+  const errSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>`;
+  try {
+    const r=await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
+    const d=await r.json();
+    if (!d.ok) throw new Error(d.error||'Error');
+    res.className='publish-result ok';
+    res.innerHTML=`${checkSvg} Published to Telegram`;
+    res.style.display='flex';
+    btn.textContent='Published';
+    document.getElementById('content-panel-badge').textContent='Published';
+  } catch(e) {
+    res.className='publish-result err';
+    res.innerHTML=`${errSvg} ${esc(e.message)}`;
+    res.style.display='flex'; btn.disabled=false;
+    btn.textContent='Publish to Telegram';
+  }
+}
+
+// ── Publish (LinkedIn) ──
+async function doPublishLi() {
+  const btn=document.getElementById('btn-publish-li');
+  const res=document.getElementById('publish-result-li');
+  btn.disabled=true; btn.textContent='Publishing...'; res.style.display='none';
+  const textToSend=document.getElementById('content-text-li').innerText.trim()||generatedContentLi;
+  const checkSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>`;
+  const errSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>`;
+  try {
+    if (!liConnected) throw new Error('LinkedIn not connected. Go to Settings to connect.');
+    const r=await fetch('/api/publish_linkedin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:textToSend})});
+    const d=await r.json();
+    if (!d.ok) throw new Error(d.error||'Error');
+    res.className='publish-result ok';
+    res.innerHTML=`${checkSvg} Published to LinkedIn`;
+    res.style.display='flex';
+    btn.textContent='Published';
+    document.getElementById('content-panel-badge').textContent='Published';
+  } catch(e) {
+    res.className='publish-result err';
+    res.innerHTML=`${errSvg} ${esc(e.message)}`;
+    res.style.display='flex'; btn.disabled=false;
+    btn.textContent='Publish to LinkedIn';
+  }
+}
+
+// ── Publish (legacy — kept for schedule) ──
 async function doPublish() {
   const btn=document.getElementById('btn-publish'), res=document.getElementById('publish-result');
   btn.disabled=true; btn.textContent='Publishing...'; res.style.display='none';
@@ -2139,6 +2266,18 @@ function discardContent() {
   document.getElementById('gen-progress').classList.remove('show');
   document.getElementById('gen-buttons').style.display='';
   generatedContent=''; generatedType='';
+  generatedContentTg=''; generatedContentLi='';
+  const tgEl=document.getElementById('content-text-tg');
+  const liEl=document.getElementById('content-text-li');
+  if (tgEl) tgEl.innerHTML='';
+  if (liEl) liEl.textContent='';
+  const resTg=document.getElementById('publish-result-tg');
+  const resLi=document.getElementById('publish-result-li');
+  if (resTg) resTg.style.display='none';
+  if (resLi) resLi.style.display='none';
+  document.getElementById('publish-result').style.display='none';
+  document.getElementById('content-panel-badge').textContent='Draft';
+  switchContentTab('tg');
 }
 
 function esc(s) {
