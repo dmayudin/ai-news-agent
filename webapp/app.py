@@ -785,18 +785,62 @@ def tma():
     return send_from_directory('static', 'tma.html')
 
 
-@app.route('/api/settings', methods=['POST'])
+ENV_FILE = '/opt/ai-news-agent/.env'
+
+def _update_env_file(key: str, value: str):
+    """Write or update a KEY=VALUE line in the .env file on disk."""
+    try:
+        lines = []
+        found = False
+        if os.path.exists(ENV_FILE):
+            with open(ENV_FILE, 'r') as f:
+                lines = f.readlines()
+        new_lines = []
+        for line in lines:
+            if line.startswith(f'{key}=') or line.startswith(f'{key} ='):
+                new_lines.append(f'{key}={value}\n')
+                found = True
+            else:
+                new_lines.append(line)
+        if not found:
+            new_lines.append(f'{key}={value}\n')
+        os.makedirs(os.path.dirname(ENV_FILE), exist_ok=True)
+        with open(ENV_FILE, 'w') as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        logger.warning('_update_env_file %s: %s', key, e)
+
+
+@app.route('/api/settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
-    """Update runtime settings (model, api key, channel)."""
+    """GET: return current (masked) settings. POST: update settings."""
+    if request.method == 'GET':
+        def mask(v):
+            if not v or len(v) < 8:
+                return ''
+            return v[:4] + '****' + v[-4:]
+        return jsonify({
+            'ok': True,
+            'openai_api_key':     mask(os.getenv('OPENAI_API_KEY', '')),
+            'cloudru_api_key':    mask(os.getenv('CLOUDRU_API_KEY', '')),
+            'openrouter_api_key': mask(os.getenv('OPENROUTER_API_KEY', '')),
+            'model':              os.getenv('LLM_MODEL', 'gpt-4.1-mini'),
+            'provider':           os.getenv('LLM_PROVIDER', 'openai'),
+            'channel_id':         os.getenv('CHANNEL_ID', '@ai_is_you'),
+        })
+
+    # POST — save settings
     try:
         body = request.get_json(force=True)
         changed = []
+
+        # ── OpenAI key ──────────────────────────────────────────────────────────
         if 'openai_api_key' in body:
             new_key = body['openai_api_key'].strip()
             if new_key:
                 os.environ['OPENAI_API_KEY'] = new_key
-                # Reinitialise agent with new key
+                _update_env_file('OPENAI_API_KEY', new_key)
                 global agent
                 agent = NewsAgent(
                     openai_api_key=new_key,
@@ -804,16 +848,45 @@ def api_settings():
                     user_id=os.getenv('TELEGRAM_USER_ID', ''),
                 )
                 changed.append('openai_api_key')
+
+        # ── Cloud.ru key ────────────────────────────────────────────────────────
+        if 'cloudru_api_key' in body:
+            new_key = body['cloudru_api_key'].strip()
+            if new_key:
+                os.environ['CLOUDRU_API_KEY'] = new_key
+                _update_env_file('CLOUDRU_API_KEY', new_key)
+                changed.append('cloudru_api_key')
+
+        # ── OpenRouter key ──────────────────────────────────────────────────────
+        if 'openrouter_api_key' in body:
+            new_key = body['openrouter_api_key'].strip()
+            if new_key:
+                os.environ['OPENROUTER_API_KEY'] = new_key
+                _update_env_file('OPENROUTER_API_KEY', new_key)
+                changed.append('openrouter_api_key')
+
+        # ── Model & Provider ────────────────────────────────────────────────────
         if 'model' in body:
             new_model = body['model'].strip()
             if new_model:
                 os.environ['LLM_MODEL'] = new_model
+                _update_env_file('LLM_MODEL', new_model)
                 changed.append('model')
+        if 'provider' in body:
+            new_provider = body['provider'].strip()
+            if new_provider:
+                os.environ['LLM_PROVIDER'] = new_provider
+                _update_env_file('LLM_PROVIDER', new_provider)
+                changed.append('provider')
+
+        # ── Channel ─────────────────────────────────────────────────────────────
         if 'channel_id' in body:
             new_channel = body['channel_id'].strip()
             if new_channel:
                 os.environ['CHANNEL_ID'] = new_channel
+                _update_env_file('CHANNEL_ID', new_channel)
                 changed.append('channel_id')
+
         return jsonify({'ok': True, 'changed': changed})
     except Exception as e:
         logger.error('api_settings: %s', e)

@@ -877,10 +877,24 @@ mark {
 }
 .settings-chevron { color: var(--muted2) }
 .settings-chevron svg { width: 14px; height: 14px }
+.settings-key-block {
+  border-bottom: 1px solid var(--border);
+}
+.settings-key-block:last-child { border-bottom: none }
+.settings-key-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 0;
+}
+.settings-key-name {
+  font-size: 12px; font-weight: 600; color: var(--text2);
+}
+.settings-key-badge {
+  font-size: 11px;
+}
 .settings-input-row {
   display: flex; gap: 8px; align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 16px 12px;
+  border-bottom: none;
 }
 .settings-input-row:last-child { border-bottom: none }
 .settings-input {
@@ -1253,18 +1267,43 @@ input[type="time"] { min-height: 44px }
       <div class="settings-section">
         <div class="settings-section-label">API Keys</div>
         <div class="settings-row">
-          <div class="settings-input-row">
-            <input class="settings-input" type="password" id="set-openai-key" placeholder="OpenAI API key (sk-...)">
-            <button class="settings-save-btn" onclick="saveApiKey('openai')">Save</button>
+
+          <!-- OpenAI -->
+          <div class="settings-key-block">
+            <div class="settings-key-header">
+              <span class="settings-key-name">OpenAI</span>
+              <span class="settings-key-badge" id="badge-openai"></span>
+            </div>
+            <div class="settings-input-row">
+              <input class="settings-input" type="password" id="set-openai-key" placeholder="OpenAI API key (sk-...)" autocomplete="new-password">
+              <button class="settings-save-btn" onclick="saveApiKey('openai')">Save</button>
+            </div>
           </div>
-          <div class="settings-input-row">
-            <input class="settings-input" type="password" id="set-cloudru-key" placeholder="Cloud.ru API key">
-            <button class="settings-save-btn" onclick="saveApiKey('cloudru')">Save</button>
+
+          <!-- Cloud.ru -->
+          <div class="settings-key-block">
+            <div class="settings-key-header">
+              <span class="settings-key-name">Cloud.ru Foundation Models</span>
+              <span class="settings-key-badge" id="badge-cloudru"></span>
+            </div>
+            <div class="settings-input-row">
+              <input class="settings-input" type="password" id="set-cloudru-key" placeholder="Cloud.ru API key" autocomplete="new-password">
+              <button class="settings-save-btn" onclick="saveApiKey('cloudru')">Save</button>
+            </div>
           </div>
-          <div class="settings-input-row">
-            <input class="settings-input" type="password" id="set-openrouter-key" placeholder="OpenRouter API key (sk-or-...)">
-            <button class="settings-save-btn" onclick="saveApiKey('openrouter')">Save</button>
+
+          <!-- OpenRouter -->
+          <div class="settings-key-block">
+            <div class="settings-key-header">
+              <span class="settings-key-name">OpenRouter</span>
+              <span class="settings-key-badge" id="badge-openrouter"></span>
+            </div>
+            <div class="settings-input-row">
+              <input class="settings-input" type="password" id="set-openrouter-key" placeholder="OpenRouter API key (sk-or-...)" autocomplete="new-password">
+              <button class="settings-save-btn" onclick="saveApiKey('openrouter')">Save</button>
+            </div>
           </div>
+
         </div>
       </div>
 
@@ -1558,6 +1597,7 @@ function showTab(name) {
   if (name==='settings') {
     loadModels();
     loadLinkedInStatus();
+    loadCurrentSettings();
   }
 }
 
@@ -1660,10 +1700,12 @@ async function selectModel(provider, modelId) {
 }
 
 async function saveApiKey(provider) {
-  const inputMap = {openai:'set-openai-key', cloudru:'set-cloudru-key', openrouter:'set-openrouter-key'};
-  const keyMap   = {openai:'openai_api_key', cloudru:'cloudru_api_key', openrouter:'openrouter_api_key'};
-  const val = document.getElementById(inputMap[provider])?.value?.trim();
-  if (!val) return;
+  const inputMap  = {openai:'set-openai-key', cloudru:'set-cloudru-key', openrouter:'set-openrouter-key'};
+  const keyMap    = {openai:'openai_api_key', cloudru:'cloudru_api_key', openrouter:'openrouter_api_key'};
+  const badgeMap  = {openai:'badge-openai',   cloudru:'badge-cloudru',   openrouter:'badge-openrouter'};
+  const inputEl   = document.getElementById(inputMap[provider]);
+  const val       = inputEl?.value?.trim();
+  if (!val) { showSettingsResult('Enter the API key first', true); return; }
   try {
     const r = await fetch('/api/settings', {
       method:'POST', credentials:'include',
@@ -1672,8 +1714,17 @@ async function saveApiKey(provider) {
     });
     const d = await r.json();
     if (d.ok) {
-      document.getElementById(inputMap[provider]).value = '';
-      showSettingsResult('✓ API key saved', false);
+      // Mask and show as placeholder
+      const masked = val.length >= 8 ? val.slice(0,4)+'****'+val.slice(-4) : '****';
+      inputEl.value = '';
+      inputEl.placeholder = masked;
+      // Update badge
+      const badgeEl = document.getElementById(badgeMap[provider]);
+      if (badgeEl) {
+        badgeEl.textContent = '✓ Saved';
+        badgeEl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#29BA74;background:rgba(41,186,116,.12);padding:2px 8px;border-radius:20px';
+      }
+      showSettingsResult('✓ API key saved and applied', false);
     } else { showSettingsResult('Error: '+d.error, true) }
   } catch(e) { showSettingsResult('Error: '+e.message, true) }
 }
@@ -1717,6 +1768,44 @@ async function loadLinkedInStatus() {
       sub.textContent = 'Not connected';
     }
   } catch(e) {}
+}
+
+// ── Load current settings (prefill masked keys + channel) ──
+async function loadCurrentSettings() {
+  try {
+    const r = await fetch('/api/settings', {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok) return;
+
+    // Map: provider -> {inputId, badgeId, emptyPlaceholder}
+    const fields = [
+      {id:'set-openai-key',     badge:'badge-openai',     val:d.openai_api_key,     ph:'OpenAI API key (sk-...)'},
+      {id:'set-cloudru-key',    badge:'badge-cloudru',    val:d.cloudru_api_key,    ph:'Cloud.ru API key'},
+      {id:'set-openrouter-key', badge:'badge-openrouter', val:d.openrouter_api_key, ph:'OpenRouter API key (sk-or-...)'},
+    ];
+
+    fields.forEach(({id, badge, val, ph}) => {
+      const input = document.getElementById(id);
+      const badgeEl = document.getElementById(badge);
+      if (input) {
+        input.value = '';
+        input.placeholder = val ? val : ph; // masked key as placeholder
+      }
+      if (badgeEl) {
+        if (val) {
+          badgeEl.textContent = '✓ Saved';
+          badgeEl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#29BA74;background:rgba(41,186,116,.12);padding:2px 8px;border-radius:20px';
+        } else {
+          badgeEl.textContent = 'Not set';
+          badgeEl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#888;background:rgba(255,255,255,.06);padding:2px 8px;border-radius:20px';
+        }
+      }
+    });
+
+    // Channel
+    const ch = document.getElementById('set-channel');
+    if (ch && d.channel_id) ch.placeholder = d.channel_id;
+  } catch(e) { console.warn('loadCurrentSettings:', e) }
 }
 
 // ── Filters ──
