@@ -875,6 +875,9 @@ mark {
 .settings-badge.inactive {
   background: var(--surface3); color: var(--muted);
 }
+.settings-badge.warn {
+  background: rgba(255,165,0,0.12); color: #FFA500;
+}
 .settings-chevron { color: var(--muted2) }
 .settings-chevron svg { width: 14px; height: 14px }
 .settings-key-block {
@@ -1328,7 +1331,7 @@ input[type="time"] { min-height: 44px }
       <div class="settings-section">
         <div class="settings-section-label">Integrations</div>
         <div class="settings-row">
-          <div class="settings-item" onclick="connectLinkedIn()" style="cursor:pointer">
+          <div class="settings-item" id="li-settings-item" onclick="connectLinkedIn()" style="cursor:pointer">
             <div class="settings-item-icon">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
             </div>
@@ -1758,16 +1761,25 @@ async function loadLinkedInStatus() {
     const d = await r.json();
     const badge = document.getElementById('li-settings-badge');
     const sub   = document.getElementById('li-settings-status');
+    const item  = document.getElementById('li-settings-item');
     if (d.connected) {
-      badge.textContent = 'Connected';
-      badge.className = 'settings-badge';
-      sub.textContent = d.name || 'LinkedIn account';
+      const tokenOk = d.token_valid !== false;
+      badge.textContent = tokenOk ? '✓ Connected' : '⚠ Token expired';
+      badge.className = tokenOk ? 'settings-badge' : 'settings-badge warn';
+      const nameStr = d.name || 'LinkedIn account';
+      const emailStr = d.email ? ` · ${d.email}` : '';
+      sub.textContent = nameStr + emailStr;
+      // Show disconnect option on click
+      if (item) item.onclick = () => {
+        if (confirm(`Disconnect ${nameStr} from LinkedIn?`)) disconnectLinkedIn();
+      };
     } else {
       badge.textContent = 'Connect';
       badge.className = 'settings-badge inactive';
       sub.textContent = 'Not connected';
+      if (item) item.onclick = connectLinkedIn;
     }
-  } catch(e) {}
+  } catch(e) { console.warn('loadLinkedInStatus:', e); }
 }
 
 // ── Load current settings (prefill masked keys + channel) ──

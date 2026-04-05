@@ -26,9 +26,19 @@ from dotenv import load_dotenv
 
 load_dotenv('/opt/ai-news-agent/.env')
 sys.path.insert(0, '/opt/ai-news-agent')
+sys.path.insert(0, '/opt/ai-news-agent/linkedin_mcp')  # LinkedIn MCP server
 
 from news_agent import NewsAgent
 from llm_client import chat_complete
+
+# LinkedIn MCP client (in-process, no subprocess overhead)
+try:
+    from linkedin_client import LinkedInClient as _LinkedInMCP
+    _li_mcp = _LinkedInMCP()
+    logger.info('LinkedIn MCP client loaded')
+except Exception as _li_mcp_err:
+    _li_mcp = None
+    logger.warning('LinkedIn MCP client not available: %s', _li_mcp_err)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -68,7 +78,9 @@ SCHEDULE_FILE  = '/opt/ai-news-agent/data/scheduled_posts.json'
 NEWS_CACHE_FILE = '/opt/ai-news-agent/data/news_cache.json'
 NEWS_CACHE_TTL  = 1800  # 30 минут — после этого фетчим свежие новости автоматически
 
-# ── LinkedIn helpers ───────────────────────────────────────────────────────────
+# ── LinkedIn helpers ──────────────────────────────────────────────────────────
+# LinkedIn REST API version (YYYYMM) — required header for /rest/* endpoints
+LINKEDIN_API_VERSION = '202503'
 
 def _li_load_tokens() -> dict:
     try:
@@ -90,11 +102,20 @@ def _li_save_tokens(data: dict):
 def _li_is_connected() -> bool:
     return bool(_li_load_tokens().get('access_token'))
 
+def _li_headers(token: str) -> dict:
+    """Standard headers for LinkedIn REST API calls."""
+    return {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
+        'LinkedIn-Version': LINKEDIN_API_VERSION,
+        'X-Restli-Protocol-Version': '2.0.0',
+    }
+
 def _li_get_valid_token() -> str:
     from datetime import timedelta
     t = _li_load_tokens()
     if not t.get('access_token'):
-        raise RuntimeError('LinkedIn not connected')
+        raise RuntimeError('LinkedIn not connected. Please reconnect in Settings.')
     expires_at = t.get('expires_at')
     if expires_at:
         try:
@@ -110,86 +131,116 @@ def _li_get_valid_token() -> str:
 
 def _li_refresh_token(t: dict) -> dict:
     from datetime import timedelta
+    if not t.get('refresh_token'):
+        raise RuntimeError('No refresh token — please reconnect LinkedIn')
     resp = requests.post('https://www.linkedin.com/oauth/v2/accessToken', data={
         'grant_type':    'refresh_token',
         'refresh_token': t['refresh_token'],
         'client_id':     LINKEDIN_CLIENT_ID,
         'client_secret': LINKEDIN_CLIENT_SECRET,
     }, timeout=15)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f'LinkedIn refresh failed ({resp.status_code}): {resp.text}')
     data = resp.json()
     if 'access_token' not in data:
         raise RuntimeError(f'LinkedIn refresh error: {data}')
     data['expires_at'] = (datetime.now(timezone.utc) + timedelta(seconds=data.get('expires_in', 5183944))).isoformat()
     if not data.get('refresh_token'):
         data['refresh_token'] = t.get('refresh_token', '')
+    # Preserve profile info
     data['sub']   = t.get('sub', '')
     data['name']  = t.get('name', '')
     data['email'] = t.get('email', '')
     _li_save_tokens(data)
+    logger.info('LinkedIn token refreshed successfully')
     return data
 
+def _li_fetch_profile(token: str) -> dict:
+    """Fetch LinkedIn profile via /v2/userinfo (OpenID Connect, always available)."""
+    try:
+        resp = requests.get(
+            'https://api.linkedin.com/v2/userinfo',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=15,
+        )
+        if resp.ok:
+            return resp.json()  # {sub, name, email, picture, given_name, family_name}
+        logger.warning('userinfo %s: %s', resp.status_code, resp.text)
+    except Exception as e:
+        logger.warning('_li_fetch_profile: %s', e)
+    return {}
+
 def _li_publish(text: str) -> dict:
+    """
+    Publish a text post to LinkedIn using the current REST Posts API.
+    Endpoint: POST /rest/posts  (replaces deprecated /v2/ugcPosts)
+    Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api
+    """
     token = _li_get_valid_token()
     t = _li_load_tokens()
     sub = t.get('sub', '')
-    # If sub is missing, try to fetch it now (handles case where userinfo timed out during OAuth)
+
+    # Ensure we have the person URN (sub)
     if not sub:
-        headers_auth = {'Authorization': f'Bearer {token}'}
-        # Try /v2/userinfo first
-        try:
-            ui = requests.get('https://api.linkedin.com/v2/userinfo',
-                              headers=headers_auth, timeout=30).json()
-            sub = ui.get('sub', '')
-            if sub:
-                t['sub'] = sub
-                t['name'] = t.get('name') or ui.get('name', '')
-                _li_save_tokens(t)
-                logger.info('Fetched LinkedIn sub from userinfo: %s', sub)
-        except Exception as e:
-            logger.warning('userinfo fetch in publish: %s', e)
-        # Fallback: /v2/me
-        if not sub:
-            try:
-                me = requests.get('https://api.linkedin.com/v2/me',
-                                  headers=headers_auth, timeout=30).json()
-                sub = me.get('id', '')
-                if sub:
-                    t['sub'] = sub
-                    fn = me.get('localizedFirstName', '')
-                    ln = me.get('localizedLastName', '')
-                    t['name'] = t.get('name') or f'{fn} {ln}'.strip()
-                    _li_save_tokens(t)
-                    logger.info('Fetched LinkedIn sub from /v2/me: %s', sub)
-            except Exception as e:
-                logger.warning('/v2/me fetch in publish: %s', e)
-        if not sub:
-            raise RuntimeError('LinkedIn person URN not found — re-authorize')
+        profile = _li_fetch_profile(token)
+        sub = profile.get('sub', '')
+        if sub:
+            t['sub']   = sub
+            t['name']  = t.get('name') or profile.get('name', '')
+            t['email'] = t.get('email') or profile.get('email', '')
+            _li_save_tokens(t)
+            logger.info('Fetched LinkedIn sub from userinfo: %s', sub)
+        else:
+            raise RuntimeError('LinkedIn person URN not found — please reconnect')
+
+    # New REST Posts API payload (replaces ugcPosts)
     payload = {
-        'author': f'urn:li:person:{sub}',
+        'author':     f'urn:li:person:{sub}',
+        'commentary': text,
+        'visibility': 'PUBLIC',
+        'distribution': {
+            'feedDistribution': 'MAIN_FEED',
+            'targetEntities': [],
+            'thirdPartyDistributionChannels': [],
+        },
         'lifecycleState': 'PUBLISHED',
-        'specificContent': {
-            'com.linkedin.ugc.ShareContent': {
-                'shareCommentary': {'text': text},
-                'shareMediaCategory': 'NONE'
-            }
-        },
-        'visibility': {'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'}
+        'isReshareDisabledByAuthor': False,
     }
+
     resp = requests.post(
-        'https://api.linkedin.com/v2/ugcPosts',
-        headers={
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0',
-        },
-        json=payload, timeout=20,
+        'https://api.linkedin.com/rest/posts',
+        headers=_li_headers(token),
+        json=payload,
+        timeout=20,
     )
+
     if resp.status_code == 201:
-        post_id = resp.headers.get('X-RestLi-Id', resp.headers.get('x-restli-id', ''))
+        post_id = resp.headers.get('x-restli-id', resp.headers.get('X-RestLi-Id', ''))
         logger.info('Published to LinkedIn: %s', post_id)
+        # Log to stats
+        try:
+            stats = _load_stats()
+            stats['posts_published'] = stats.get('posts_published', 0) + 1
+            stats.setdefault('history', []).insert(0, {
+                'type': 'linkedin',
+                'text': text[:120],
+                'post_id': post_id,
+                'ts': datetime.now(timezone.utc).isoformat(),
+            })
+            stats['history'] = stats['history'][:50]
+            _save_stats(stats)
+        except Exception:
+            pass
         return {'ok': True, 'post_id': post_id}
-    raise RuntimeError(f'LinkedIn API {resp.status_code}: {resp.text}')
+
+    # Detailed error logging
+    logger.error('LinkedIn publish failed %s: %s', resp.status_code, resp.text)
+    try:
+        err_body = resp.json()
+        msg = err_body.get('message') or err_body.get('error') or resp.text
+    except Exception:
+        msg = resp.text
+    raise RuntimeError(f'LinkedIn API error {resp.status_code}: {msg}')
 
 @app.after_request
 def cors(r):
@@ -650,7 +701,7 @@ def linkedin_auth():
 
 @app.route('/linkedin/callback')
 def linkedin_callback():
-    """OAuth callback: exchange code for tokens and save them."""
+    """OAuth callback: exchange code for tokens via LinkedIn MCP server."""
     error = request.args.get('error')
     if error:
         desc = request.args.get('error_description', error)
@@ -659,7 +710,7 @@ def linkedin_callback():
 
     code  = request.args.get('code', '')
     state = request.args.get('state', '')
-    # Проверяем state если сессия ещё жива
+    # CSRF state check
     expected_state = session.get('linkedin_state')
     if expected_state and state != expected_state:
         return '<h2>Ошибка state</h2><p>CSRF check failed</p>', 400
@@ -668,58 +719,48 @@ def linkedin_callback():
         return '<h2>Ошибка</h2><p>No authorization code received</p>', 400
 
     try:
-        from datetime import timedelta
-        # Exchange code for tokens
-        resp = requests.post('https://www.linkedin.com/oauth/v2/accessToken', data={
-            'grant_type':    'authorization_code',
-            'code':          code,
-            'redirect_uri':  LINKEDIN_REDIRECT_URI,
-            'client_id':     LINKEDIN_CLIENT_ID,
-            'client_secret': LINKEDIN_CLIENT_SECRET,
-        }, timeout=15)
-        resp.raise_for_status()
-        token_data = resp.json()
-        if 'access_token' not in token_data:
-            raise RuntimeError(f'Token exchange failed: {token_data}')
-
-        expires_in = token_data.get('expires_in', 5183944)
-        token_data['expires_at'] = (
-            datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-        ).isoformat()
-
-        # Get user info (sub = person ID) — optional, save token even if this fails
-        try:
-            ui_resp = requests.get('https://api.linkedin.com/v2/userinfo', headers={
-                'Authorization': f'Bearer {token_data["access_token"]}'
-            }, timeout=30)
-            ui = ui_resp.json() if ui_resp.ok else {}
-        except Exception as ui_err:
-            logger.warning('userinfo fetch failed (non-fatal): %s', ui_err)
-            ui = {}
-        token_data['sub']   = ui.get('sub', '')
-        token_data['name']  = ui.get('name', '')
-        token_data['email'] = ui.get('email', '')
-
-        # If sub is still empty, try /v2/me endpoint as fallback
-        if not token_data['sub']:
+        # Use MCP client to exchange code (handles token storage, userinfo, etc.)
+        if _li_mcp:
+            result = _li_mcp.exchange_code(code)
+            if not result.get('ok'):
+                raise RuntimeError(result.get('error', 'Token exchange failed'))
+            name = result.get('name', '') or 'LinkedIn Account'
+        else:
+            # Fallback: direct exchange without MCP
+            from datetime import timedelta
+            resp = requests.post('https://www.linkedin.com/oauth/v2/accessToken', data={
+                'grant_type':    'authorization_code',
+                'code':          code,
+                'redirect_uri':  LINKEDIN_REDIRECT_URI,
+                'client_id':     LINKEDIN_CLIENT_ID,
+                'client_secret': LINKEDIN_CLIENT_SECRET,
+            }, timeout=15)
+            if not resp.ok:
+                raise RuntimeError(f'Token exchange failed ({resp.status_code}): {resp.text}')
+            token_data = resp.json()
+            if 'access_token' not in token_data:
+                raise RuntimeError(f'No access_token: {token_data}')
+            expires_in = token_data.get('expires_in', 5183944)
+            token_data['expires_at'] = (
+                datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            ).isoformat()
+            # Fetch userinfo
             try:
-                me_resp = requests.get('https://api.linkedin.com/v2/me', headers={
-                    'Authorization': f'Bearer {token_data["access_token"]}'
-                }, timeout=30)
-                me = me_resp.json() if me_resp.ok else {}
-                token_data['sub'] = me.get('id', '')
-                if not token_data['name']:
-                    fn = me.get('localizedFirstName', '')
-                    ln = me.get('localizedLastName', '')
-                    token_data['name'] = f'{fn} {ln}'.strip()
-            except Exception as me_err:
-                logger.warning('me fetch failed (non-fatal): %s', me_err)
+                ui = requests.get('https://api.linkedin.com/v2/userinfo',
+                    headers={'Authorization': f'Bearer {token_data["access_token"]}'},
+                    timeout=15).json()
+                token_data['sub']   = ui.get('sub', '')
+                token_data['name']  = ui.get('name', '')
+                token_data['email'] = ui.get('email', '')
+            except Exception:
+                token_data.setdefault('sub', '')
+                token_data.setdefault('name', '')
+                token_data.setdefault('email', '')
+            _li_save_tokens(token_data)
+            name = token_data.get('name', '') or 'LinkedIn Account'
 
-        _li_save_tokens(token_data)
         session.pop('linkedin_state', None)
-
-        name = token_data.get('name', '') or 'LinkedIn Account'
-        logger.info('LinkedIn connected, sub=%s name=%s', token_data.get('sub','?'), name)
+        logger.info('LinkedIn connected: %s', name)
 
         return f'''
 <!DOCTYPE html><html lang="ru">
@@ -744,35 +785,80 @@ def linkedin_callback():
 @app.route('/api/linkedin/status')
 @login_required
 def api_linkedin_status():
-    """Return LinkedIn connection status."""
+    """Return LinkedIn connection status via MCP."""
+    if _li_mcp:
+        status = _li_mcp.get_status()
+        return jsonify({'ok': True, **status})
+    # Fallback without MCP
     t = _li_load_tokens()
     connected = bool(t.get('access_token'))
+    token_valid = True
+    if connected and t.get('expires_at'):
+        try:
+            from datetime import timedelta
+            exp = datetime.fromisoformat(t['expires_at'])
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            token_valid = datetime.now(timezone.utc) < exp
+        except Exception:
+            pass
     return jsonify({
         'ok': True,
         'connected': connected,
-        'name':  t.get('name', ''),
-        'email': t.get('email', ''),
+        'name':        t.get('name', ''),
+        'email':       t.get('email', ''),
+        'sub':         t.get('sub', ''),
+        'expires_at':  t.get('expires_at', ''),
+        'token_valid': token_valid,
     })
 
 
 @app.route('/api/linkedin/disconnect', methods=['POST'])
 @login_required
 def api_linkedin_disconnect():
-    """Clear LinkedIn tokens."""
-    _li_save_tokens({})
-    return jsonify({'ok': True})
+    """Clear LinkedIn tokens via MCP."""
+    if _li_mcp:
+        result = _li_mcp.disconnect()
+    else:
+        _li_save_tokens({})
+        result = {'ok': True}
+    return jsonify(result)
+
+
+@app.route('/api/linkedin/refresh', methods=['POST'])
+@login_required
+def api_linkedin_refresh():
+    """Manually refresh LinkedIn access token via MCP."""
+    if not _li_mcp:
+        return jsonify({'ok': False, 'error': 'MCP not available'}), 500
+    result = _li_mcp.refresh_token()
+    return jsonify(result)
+
+
+@app.route('/api/linkedin/profile')
+@login_required
+def api_linkedin_profile():
+    """Get LinkedIn profile info via MCP."""
+    if not _li_mcp:
+        return jsonify({'ok': False, 'error': 'MCP not available'}), 500
+    result = _li_mcp.get_profile()
+    return jsonify(result)
 
 
 @app.route('/api/publish_linkedin', methods=['POST'])
 @login_required
 def api_publish_linkedin():
-    """Publish a post to LinkedIn."""
+    """Publish a post to LinkedIn via MCP."""
     try:
         body = request.get_json(force=True)
         text = (body.get('text') or '').strip()
         if not text:
             return jsonify({'ok': False, 'error': 'Empty text'}), 400
-        result = _li_publish(text)
+        # Use MCP client if available, otherwise fall back to direct helper
+        if _li_mcp:
+            result = _li_mcp.publish_post(text)
+        else:
+            result = _li_publish(text)
         return jsonify(result)
     except Exception as e:
         logger.error('api_publish_linkedin: %s', e, exc_info=True)
