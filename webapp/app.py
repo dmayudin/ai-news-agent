@@ -26,22 +26,28 @@ from dotenv import load_dotenv
 
 load_dotenv('/opt/ai-news-agent/.env')
 sys.path.insert(0, '/opt/ai-news-agent')
-sys.path.insert(0, '/opt/ai-news-agent/linkedin_mcp')  # LinkedIn MCP server
+
+# Logging must be configured BEFORE any imports that use it
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+logger = logging.getLogger(__name__)
 
 from news_agent import NewsAgent
 from llm_client import chat_complete
 
 # LinkedIn MCP client (in-process, no subprocess overhead)
+# webapp/app.py is in <root>/webapp/, so linkedin_mcp is at <root>/linkedin_mcp/
+_APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # <root>
+_LI_MCP_DIR = os.path.join(_APP_ROOT, 'linkedin_mcp')
+if _LI_MCP_DIR not in sys.path:
+    sys.path.insert(0, _LI_MCP_DIR)
+
 try:
     from linkedin_client import LinkedInClient as _LinkedInMCP
     _li_mcp = _LinkedInMCP()
-    logger.info('LinkedIn MCP client loaded')
+    logger.info('LinkedIn MCP client loaded from %s', _LI_MCP_DIR)
 except Exception as _li_mcp_err:
     _li_mcp = None
     logger.warning('LinkedIn MCP client not available: %s', _li_mcp_err)
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -70,7 +76,7 @@ CHANNEL_ID = os.getenv('CHANNEL_ID', '@ai_is_you')
 LINKEDIN_CLIENT_ID     = os.getenv('LINKEDIN_CLIENT_ID', '')
 LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET', '')
 LINKEDIN_REDIRECT_URI  = os.getenv('LINKEDIN_REDIRECT_URI', 'https://ai.colliecore.com/linkedin/callback')
-LINKEDIN_TOKENS_FILE   = '/opt/ai-news-agent/data/linkedin_tokens.json'
+LINKEDIN_TOKENS_FILE   = os.getenv('LINKEDIN_TOKENS_FILE', '/opt/ai-news-agent/data/linkedin_tokens.json')
 
 # Путь к файлу очереди отложенных публикаций (shared-data volume)
 SCHEDULE_FILE  = '/opt/ai-news-agent/data/scheduled_posts.json'
